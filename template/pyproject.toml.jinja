@@ -1,0 +1,259 @@
+[build-system]
+requires = [
+  "hatchling>=1.27",
+  "uv-dynamic-versioning>=0.14",
+]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "{{ package_path }}",
+]
+
+[project]
+name = "{{ distribution_name }}"
+description = "{{ project_description }}"
+readme = "README.md"
+license = "{{ license }}"
+license-files = [
+  "LICENSE",
+]
+maintainers = [
+  { name = "{{ user_name }}", email = "{{ user_email }}" },
+]
+authors = [
+  { name = "{{ user_name }}", email = "{{ user_email }}" },
+]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Typing :: Typed",
+]
+dynamic = [
+  "version",
+]
+{%- if cli == 'click' %}
+dependencies = [
+  "click>=8.3",
+]
+{%- elif cli == 'typer' %}
+dependencies = [
+  "typer>=0.20",
+]
+{%- elif cli == 'cyclopts' %}
+dependencies = [
+  "cyclopts>=4",
+]
+{%- else %}
+dependencies = [  ]
+{%- endif %}
+{%- if docs %}
+urls.Changelog = "{{ documentation_url }}/changelog"
+urls.Documentation = "{{ documentation_url }}/"
+{%- else %}
+urls.Changelog = "{{ repository_url }}/blob/main/CHANGELOG.md"
+{%- endif %}
+urls.Homepage = "{{ repository_url }}"
+urls.Issues = "{{ repository_url }}/issues"
+urls.Repository = "{{ repository_url }}"
+{% if cli == 'typer' or cli == 'cyclopts' -%}
+scripts.{{ distribution_name }} = "{{ package_name }}.cli:app"
+{% elif cli -%}
+scripts.{{ distribution_name }} = "{{ package_name }}.cli:main"
+{% endif %}
+[dependency-groups]
+dev = [
+  { include-group = "lint" },
+  { include-group = "release" },
+  { include-group = "test" },
+  { include-group = "type" },
+]
+test = [
+  "coverage[toml]>=7.11",
+  "pytest>=9",
+  "pytest-xdist>=3.8",
+]
+type = [
+  "mypy>=1.15",
+  { include-group = "test" },
+]
+{%- if docs == "zensical" %}
+docs = [
+  "zensical>=0.0.11",
+  "mkdocstrings-python>=2",
+]
+{%- endif %}
+lint = [
+  "pre-commit>=4.5",
+]
+release = [
+  "towncrier>=25.8",
+]
+[tool.ruff]
+line-length = 88
+target-version = "{{ target_python }}"
+lint.select = [
+  "E",
+  "W",
+  "F",
+  "I",
+  "UP",
+  "B",
+  "C4",
+  "SIM",
+  "PIE",
+  "RUF",
+]
+lint.ignore = [
+  "E501",
+  "COM812", # conflicts with formatter
+  "ISC001", # conflicts with formatter
+]
+lint.per-file-ignores."tests/**" = [
+  "S101", # using assert is okay in tests
+]
+lint.isort.known-first-party = [
+  "{{ package_name }}",
+]
+lint.pydocstyle.convention = "numpy"
+format.quote-style = "double"
+format.indent-style = "space"
+format.docstring-code-format = true
+lint.future-annotations = true
+
+[tool.codespell]
+write-changes = true
+
+[tool.pyproject-fmt]
+[tool.pytest]
+minversion = "9.0"
+addopts = [
+  "-ra",
+  "-v",
+  "--tb=short",
+{%- if 'readme' in doctest or 'docs' in doctest %}
+  "--doctest-glob",
+  "*.md",
+{%- endif %}
+{%- if 'docstrings' in doctest %}
+  "--doctest-modules",
+{%- endif %}
+  "--showlocals",
+]
+filterwarnings = [
+  "error",
+]
+log_level = "INFO"
+testpaths = [
+{%- if 'docs' in doctest %}
+  "docs",
+{%- endif %}
+{%- if 'docstrings' in doctest %}
+  "{{ package_root }}",
+{%- endif %}
+  "tests",
+{%- if 'readme' in doctest %}
+  "README.md",
+{%- endif %}
+]
+strict = true
+
+[tool.coverage]
+html.show_contexts = true
+html.skip_covered = false
+paths.source = [
+  "{{ package_root }}",
+  ".nox/**/site-packages",
+]
+report.exclude_also = [
+  "-> [\"']?(Never|NoReturn)[\"']?:",
+  "^\\s*(typing\\.)?assert_never\\b",
+  "^\\s*@(abc\\.)?abstractmethod\\b",
+  "^\\s*@(typing\\.)?overload\\b",
+  "^\\s*if (typing\\.)?TYPE_CHECKING:",
+  "^\\s*if False:",
+  "^\\s*raise NotImplementedError\\b",
+  "^\\s*return NotImplemented\\b",
+  "^if __name__ == [\"']__main__[\"']:$",
+]
+report.fail_under = 100
+report.show_missing = true
+report.skip_covered = true
+run.branch = true
+run.dynamic_context = "test_function"
+run.omit = [
+  "__main__.py",
+  "setup.py",
+]
+run.patch = [
+  "subprocess",
+]
+run.source_dirs = [
+  "tests",
+]
+run.source_pkgs = [
+  "{{ package_name }}",
+]
+
+[tool.towncrier]
+name = "{{ project_name }}"
+filename = "CHANGELOG.md"
+directory = "changelog.d"
+start_string = "<!-- towncrier release notes start -->\n"
+underlines = [ "", "", "" ]
+title_format = "## [{version}]({{ repository_url }}/tree/v{version}) - {project_date}"
+issue_format = "[#{issue}]({{ repository_url }}/issues/{issue})"
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[tool.mypy]
+python_version = "3.{{ target_python[3:] }}"
+warn_unreachable = true
+enable_error_code = [
+  "ignore-without-code",
+  "redundant-expr",
+  "truthy-bool",
+]
+strict = true
+pretty = true

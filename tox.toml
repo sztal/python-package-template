@@ -1,0 +1,65 @@
+requires = [
+  "tox>=4.23.2",
+  "tox-uv>=1.25",
+  "uv>=0.8.6",
+]
+env_list = [
+  "lint",
+  "typecheck",
+  "docs",
+]
+
+[env_run_base]
+runner = "uv-venv-lock-runner"
+
+[env.lint]
+description = "run pre-commit linting"
+skip_install = true
+pass_env = [
+  "DISABLE_PRE_COMMIT_UV_PATCH",
+]
+set_env = [
+  { FORCE_PRE_COMMIT_UV_PATCH = "1" },
+]
+dependency_groups = [ "lint" ]
+commands = [
+  [
+    "pre-commit",
+    "run",
+    "--all-files",
+    { replace = "posargs", extend = true },
+  ],
+]
+
+[env.typecheck]
+description = "typecheck Python code"
+dependency_groups = [ "type" ]
+commands = [
+  [ "mypy", "extensions" ],
+]
+
+[env.docs]
+description = "build the documentation"
+skip_install = true
+dependency_groups = [ "docs" ]
+commands = [
+  [
+    "zensical",
+    "build",
+    "--clean",
+    { replace = "posargs", extend = true },
+  ],
+]
+
+[env.autodocs]
+description = "serve the documentation locally"
+skip_install = true
+dependency_groups = [ "docs" ]
+commands = [
+  [
+    "zensical",
+    "serve",
+    "--open",
+    { replace = "posargs", extend = true },
+  ],
+]

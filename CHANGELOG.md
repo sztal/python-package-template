@@ -1,0 +1,414 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Calendar Versioning](https://calver.org/).
+
+This project uses [*towncrier*](https://towncrier.readthedocs.io/).
+
+<!-- towncrier release notes start -->
+
+## [2025.12.10.1](https://github.com/sztal/python-package-template/tree/v2025.12.10.1)
+
+### Changed
+
+- Rename release jobs.
+
+
+## [2025.12.10](https://github.com/sztal/python-package-template/tree/v2025.12.10)
+
+### Changed
+
+- Bump astral-sh/setup-uv from 6 to 7.
+- Install `nox` instead of `nox[uv]` as uv is already installed.
+- Run CI on tags.
+- Run `uv build` to build Python package distributions.
+- Run checks and tests in parallel in CI.
+- Use Python 3.14 to install Nox in CI.
+- Use Python 3.14 to install tox in CI.
+- Use `null` for null values in YAML.
+
+
+## [2025.12.9](https://github.com/sztal/python-package-template/tree/v2025.12.9)
+
+### Removed
+
+- Remove unnecessary setting `site_dir: site` from `mkdocs.yml`.
+
+### Added
+
+- Add an option to use Zensical.
+- Add icons to MkDocs documentation pages.
+- Add the license text to the documentation.
+
+### Changed
+
+- Edit theme features for MkDocs.
+- Remove heading in `docs/reference/cli.md`.
+- Remove unused patterns from `.gitignore` and add comments.
+- Switch to Calendar Versioning `YYYY.MM.DD.MICRO`.
+- Use mkdocs-click to create the CLI reference.
+
+### Fixed
+
+- Remove the CLI reference from the MkDocs documentation when the project does not provide `console_scripts` entry points.
+
+
+## [5.0.0](https://github.com/sztal/python-package-template/tree/v5.0.0)
+
+### Removed
+
+- Remove unnecessary pre-commit hooks.
+
+### Added
+
+- Add pre-commit hook to check documentation sources.
+
+### Changed
+
+- Add mkdocstrings-python to the `docs` dependency group and set its lower version boundary to 2.0.0.
+- Bump the lower version boundary for Black to 25.11.0.
+- Bump the lower version boundary for Click to 8.3.0.
+- Bump the lower version boundary for Material for MkDocs to 9.7.0.
+- Bump the lower version boundary for Towncrier to 25.8.0.
+- Bump the lower version boundary for Typer to 0.20.0.
+- Bump the lower version boundary for pre-commit to 4.5.0.
+- Bump the lower version boundary for pytest-xdist to 3.8.0.
+- Refactor the reference section of the MkDocs documentation.
+- Remove syntax highlighting for commands.
+- Rename the MkDocs configuration file from `mkdocs.yaml` to `mkdocs.yml`.
+- Turn on `show_root_heading`, `type_parameter_headings` and `show_signature_type_parameters` for mkdocstrings-python.
+- Update pre-commit hooks.
+
+### Fixed
+
+- Add TOML support for Coverage.py.
+
+
+## [4.11.0](https://github.com/sztal/python-package-template/tree/v4.11.0)
+
+### Changed
+
+- Improve `scripts/release.py`. It can now pass arguments or options to `uv version` and create GitHub releases.
+- Remove the trailing slash from the documentation URL.
+
+
+## [4.10.0](https://github.com/sztal/python-package-template/tree/v4.10.0)
+
+### Removed
+
+- Remove the short version flag `-V` for all command-line interfaces.
+- Stop formatting documentation sources.
+
+### Changed
+
+- Bump the lower version boundary for Cyclopts to 4.0.0.
+- Bump the lower version boundary for pytest to 9.0.0.
+- Make Cyclopts applications return an exit code.
+- Update pre-commit hooks.
+- Use `[tool.pytest]` to provide pytest settings and turn on the new strict mode.
+- Use `typer.echo` to print the version.
+- Use blacken-docs to format Python code blocks in documentation files.
+
+
+## [4.9.0](https://github.com/sztal/python-package-template/tree/v4.9.0)
+
+### Changed
+
+- Remove `if __name__ == "__main__":` from `__main__.py`.
+- Stop turning warnings into errors when serving the documentation locally.
+- Use raw strings in `mkdocs.yaml`.
+
+
+## [4.8.0](https://github.com/sztal/python-package-template/tree/v4.8.0)
+
+### Changed
+
+- Turn off live logs when running tests.
+
+
+## [4.7.0](https://github.com/sztal/python-package-template/tree/v4.7.0)
+
+### Changed
+
+- Format `pyproject.toml`.
+- Stop reading `VERSION.txt` to set the version attribute.
+
+
+## [4.6.0](https://github.com/sztal/python-package-template/tree/v4.6.0)
+
+### Changed
+
+- Update pre-commit hooks.
+
+
+## [4.5.0](https://github.com/sztal/python-package-template/tree/v4.5.0)
+
+### Changed
+
+- Add `.gitignore` to the package root to ignore `VERSION.txt`.
+- Bump the lower version boundary for Coverage.py to 7.11.0.
+- Edit docstring in `scripts/release.py`.
+
+### Fixed
+
+- Fix command in Nox session `typecheck`.
+
+
+## [4.4.0](https://github.com/sztal/python-package-template/tree/v4.4.0)
+
+### Changed
+
+- Rename dependency group `tests` into `test`.
+
+
+## [4.3.0](https://github.com/sztal/python-package-template/tree/v4.3.0)
+
+### Added
+
+- Run tests under Python 3.14.
+
+### Changed
+
+- Drop support for Python 3.9 and add support for Python 3.14.
+
+
+## [4.2.0](https://github.com/sztal/python-package-template/tree/v4.2.0)
+
+### Changed
+
+- Make Nox raise an error on missing interpreters in CI.
+- Use the default cache dependency glob for `astral-sh/setup-uv`.
+
+
+## [4.1.3](https://github.com/sztal/python-package-template/tree/v4.1.3)
+
+### Fixed
+
+- Remove an unused `noqa` directive in `scripts/release.py` when the project version is provided dynamically.
+
+
+## [4.1.2](https://github.com/sztal/python-package-template/tree/v4.1.2)
+
+### Fixed
+
+- Remove an unused import in `scripts/release.py` when the project version is provided dynamically.
+
+
+## [4.1.1](https://github.com/sztal/python-package-template/tree/v4.1.1)
+
+### Fixed
+
+- Add the project description to `README.md`.
+
+
+## [4.1.0](https://github.com/sztal/python-package-template/tree/v4.1.0)
+
+### Changed
+
+- Rename the `print_error` function to `print_err` in `scripts/release.py`.
+
+
+## [4.0.0](https://github.com/sztal/python-package-template/tree/v4.0.0)
+
+### Security
+
+- Set a lower version boundary for uv to create Nox sessions and tox environments.
+
+### Removed
+
+- Stop checking package distributions.
+
+### Changed
+
+- Bump the lower version boundary for uv-build to 0.8.6.
+- Change the default build backend to uv-build.
+- Create a function to install dependencies with `uv sync` in `noxfile.py`.
+- In Nox sessions, set `COVERAGE_FILE` if it is not set yet.
+- Refactor typechecking tasks into one task.
+- Rename local variable in `scripts/release.py`.
+- Use command-line options to install dependency groups.
+
+### Fixed
+
+- Install the package in editable mode to build the documentation.
+
+
+## [3.1.1](https://github.com/sztal/python-package-template/tree/v3.1.1)
+
+### Changed
+
+- Sort version flags for Cyclopts CLIs.
+
+
+## [3.1.0](https://github.com/sztal/python-package-template/tree/v3.1.0)
+
+### Changed
+
+- Add minor changes to `README.md` and update the documentation homepage with the contents of `README.md`.
+- Update the release script `scripts/release.py`.
+
+
+## [3.0.0](https://github.com/sztal/python-package-template/tree/v3.0.0)
+
+### Added
+
+- Add badges to `README.md`.
+
+### Changed
+
+- Allow Ruff to add `from __future__ import annotations` to enable the deferred evaluation of annotations.
+- Import the extension loader from `copier_template_extensions` instead of `copier_templates_extensions`.
+
+
+## [2.4.0](https://github.com/sztal/python-package-template/tree/v2.4.0)
+
+### Added
+
+- Add the description to `README.md`.
+
+### Changed
+
+- Shorten URLs.
+
+
+## [2.3.0](https://github.com/sztal/python-package-template/tree/v2.3.0)
+
+### Added
+
+- Add badges to `README.md`.
+- Add badges to the documentation homepage.
+
+### Changed
+
+- Bump actions/checkout from 4 to 5.
+- Bump actions/download-artifact from 4 to 5.
+- Bump astral-sh/setup-uv from 5 to 6.
+- Update pre-commit hooks.
+
+
+## [2.2.0](https://github.com/sztal/python-package-template/tree/v2.2.0)
+
+### Changed
+
+- Capitalize `Project-URL` labels in `pyproject.toml`.
+
+
+## [2.1.0](https://github.com/sztal/python-package-template/tree/v2.1.0)
+
+### Security
+
+- Bump the lower version boundary for uv to 0.8.6.
+
+### Added
+
+- Add license and requirements to the documentation.
+- Start a new dynamic coverage context for each test function.
+
+### Changed
+
+- Edit descriptions in `tox.toml` and `noxfile.py`.
+- Update pre-commit hooks to their latest versions.
+
+
+## [2.0.0](https://github.com/sztal/python-package-template/tree/v2.0.0)
+
+### Added
+
+- Add an option to use Cyclopts.
+
+### Changed
+
+- Bump the lower version boundary for Typer to 0.16.
+- Require Copier Template-Extensions to generate projects.
+- Rewrite the quick setup and usage guide.
+- Sort CLI options in source code and tests.
+
+
+## [1.5.0](https://github.com/sztal/python-package-template/tree/v1.5.0)
+
+### Changed
+
+- Add Git user information to globals during generation.
+- Stop creating reports for test runs.
+- Stop using pytest-cov and require Coverage.py 7.10 or more.
+
+### Fixed
+
+- Always install uv to run Nox sessions.
+
+
+## [1.4.0](https://github.com/sztal/python-package-template/tree/v1.4.0)
+
+### Added
+
+- Add Towncrier to the `release` dependency group.
+
+### Changed
+
+- Use pre-commit instead of pre-commit-uv.
+
+
+## [1.3.0](https://github.com/sztal/python-package-template/tree/v1.3.0)
+
+### Changed
+
+- Drop the legacy alias for Ruff's lint hook.
+- Manage `scripts/release.py` using inline metadata.
+- Remove the upper version boundary for uv-build.
+- Update pre-commit hooks.
+
+
+## [1.2.1](https://github.com/sztal/python-package-template/tree/v1.2.1)
+
+### Fixed
+
+- Prevent coverage warnings for unclosed SQLite connections being raised as errors.
+
+
+## [1.2.0](https://github.com/sztal/python-package-template/tree/v1.2.0)
+
+### Added
+
+- Print log records with `INFO` or higher level to the console during testing.
+
+### Changed
+
+- Stop setting the log level to `INFO` during testing.
+
+
+## [1.1.1](https://github.com/sztal/python-package-template/tree/v1.1.1)
+
+### Fixed
+
+- Fix the extension of the version test.
+
+
+## [1.1.0](https://github.com/sztal/python-package-template/tree/v1.1.0)
+
+### Changed
+
+- Add hatch-vcs to default Hatch plugins.
+- In pytest options, write the minimum log message level that should be captured for logging capture in uppercase.
+- Parse the target version as an argument in `scripts/release.py`.
+- Remove `mkdocs.yaml` from the watch list.
+- Remove unnecessary pytest option for coverage (see <https://pytest-cov.readthedocs.io/en/latest/xdist.html>).
+- Rename `build_backend` to `backend`.
+- Update pre-commit hooks to their latest versions.
+- Use our own settings for code coverage.
+- Use single quotes in commands.
+
+### Fixed
+
+- Add missing comma in `noxfile.py`.
+- Fix sources to measure coverage for.
+- Fix variable name in `noxfile.py`.
+- Removed unused import in `noxfile.py`: `from nox.command import CommandFailed`.
+
+
+## [1.0.0](https://github.com/sztal/python-package-template/tree/v1.0.0)
+
+### Added
+
+- Initial release.

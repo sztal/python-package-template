@@ -1,0 +1,55 @@
+---
+ci:
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+
+exclude: ^(template/)?(CHANGELOG\.md|CODE_OF_CONDUCT\.md)$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.11.1
+    hooks:
+      - id: pyproject-fmt
+
+  - repo: https://github.com/tox-dev/tox-toml-fmt
+    rev: v1.2.1
+    hooks:
+      - id: tox-toml-fmt
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.18
+    hooks:
+      - id: uv-lock
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.40.0
+    hooks:
+      - id: typos
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        exclude: ^(docs/|template/\{% if docs %\}docs\{% endif %\}/)
+        additional_dependencies:
+          - mdformat-gfm
+      - id: mdformat
+        files: ^docs/
+        additional_dependencies:
+          - mdformat-footnote
+          - mdformat-front-matters
+          - mdformat-simple-breaks
