@@ -15,6 +15,10 @@ help:
 	@echo "  lint           Run pre-commit checks"
 	@echo "  format         Format Python files with Ruff"
 
+init:
+	make install
+	pre-commit install
+
 clean:
 	rm -rf dist/ build/ .nox/ .pytest_cache/ .ruff_cache/ htmlcov/
 	find . -name "*.egg-info" -type d -prune -exec rm -rf {} +
