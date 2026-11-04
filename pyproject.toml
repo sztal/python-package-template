@@ -72,8 +72,8 @@ release = [
 ]
 
 [tool.ruff]
-line-length = 88
 target-version = "py310"
+line-length = 88
 extend-exclude = [  ]
 lint.select = [
   "ALL",
@@ -96,6 +96,7 @@ lint.pydocstyle.convention = "google"
 lint.future-annotations = true
 
 [tool.pyproject-fmt]
+
 [tool.pytest.ini_options]
 addopts = "-v --tb=short"
 filterwarnings = [

@@ -44,12 +44,9 @@ repos:
     rev: 1.0.0
     hooks:
       - id: mdformat
+        args: [--number]
+        # Zensical uses directives that mdformat does not preserve.
         exclude: ^(docs/|template/\{% if docs %\}docs\{% endif %\}/)
         additional_dependencies:
           - mdformat-gfm
-      - id: mdformat
-        files: ^docs/
-        additional_dependencies:
-          - mdformat-footnote
           - mdformat-front-matters
-          - mdformat-simple-breaks
