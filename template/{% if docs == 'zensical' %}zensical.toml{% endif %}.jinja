@@ -6,11 +6,13 @@ site_url = "{{ documentation_url }}/"
 copyright = "Copyright &copy; {{ copyright_year }} {{ copyright_owner }}"
 repo_url =  "{{ repository_url }}"
 repo_name = "{{ repository_path }}"
-edit_uri = "edit/main/docs/"
+edit_uri = "edit/{{ integration_branch }}/docs/"
 nav = [
   { "Home" = [
     "index.md",
+{% if changelog %}
     { "Release notes" = "changelog.md" },
+{% endif %}
     { "Building and releasing" = "releasing.md" },
     { "License" = "license.md" },
   ] },

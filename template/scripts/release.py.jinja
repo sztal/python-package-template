@@ -14,6 +14,8 @@ from packaging.version import InvalidVersion, Version
 
 from scripts.distributions import release_version
 
+INTEGRATION_BRANCH = "{{ integration_branch }}"
+
 
 def git(directory: Path, *args: str) -> str:
     """Run Git and return its output."""
@@ -27,20 +29,27 @@ def clean(directory: Path) -> None:
 
 
 def state(directory: Path) -> tuple[str, str]:
-    """Check that local main contains the current remote main."""
+    """Check that the local integration branch contains its remote."""
     clean(directory)
-    if git(directory, "symbolic-ref", "--short", "HEAD") != "main":
-        raise RuntimeError("Release preparation requires the main branch")
+    if git(directory, "symbolic-ref", "--short", "HEAD") != INTEGRATION_BRANCH:
+        raise RuntimeError(
+            f"Release preparation requires the {INTEGRATION_BRANCH} branch"
+        )
     head = git(directory, "rev-parse", "HEAD")
     remote = git(
-        directory, "ls-remote", "--exit-code", "origin", "refs/heads/main"
+        directory,
+        "ls-remote",
+        "--exit-code",
+        "origin",
+        f"refs/heads/{INTEGRATION_BRANCH}",
     ).split()[0]
     result = subprocess.run(
         ["git", "merge-base", "--is-ancestor", remote, head], check=False, cwd=directory
     )
     if result.returncode:
         raise RuntimeError(
-            "Local main does not contain origin/main; fetch and reconcile it"
+            f"Local {INTEGRATION_BRANCH} does not contain origin/{INTEGRATION_BRANCH}; "
+            "fetch and reconcile it"
         )
     git(directory, "ls-files", "--error-unmatch", "uv.lock")
     return head, remote
@@ -61,7 +70,7 @@ def check_available(directory: Path, tag: str) -> None:
             continue
         if previous >= version:
             raise ValueError(f"Release must be newer than {existing}")
-
+{% if changelog %}
 
 def notes(directory: Path, version: str) -> None:
     """Preview Towncrier notes without changing files."""
@@ -81,7 +90,7 @@ def notes(directory: Path, version: str) -> None:
         cwd=directory,
         check=True,
     )
-
+{% endif %}
 
 def validate(directory: Path, tag: str) -> None:
     """Run all checks against the tagged checkout."""
@@ -93,7 +102,7 @@ def validate(directory: Path, tag: str) -> None:
 def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
     """Validate a release in an isolated clone and optionally install it locally."""
     tag = f"v{version}"
-    parsed = release_version(tag)
+    release_version(tag)
     head, remote = state(directory)
     check_available(directory, tag)
     temporary = Path(mkdtemp(prefix="package-release-"))
@@ -113,7 +122,8 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         git(checkout, "checkout", "--detach", head)
         for key in ("user.name", "user.email"):
             git(checkout, "config", key, git(directory, "config", "--get", key))
-        if parsed.is_prerelease:
+{% if changelog %}
+        if release_version(tag).is_prerelease:
             notes(checkout, version)
         else:
             subprocess.run(
@@ -134,11 +144,14 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
             )
             git(checkout, "add", "--", "CHANGELOG.md", "changelog.d")
             git(checkout, "commit", "-m", f"Prepare release {version}")
+{% endif %}
         git(checkout, "tag", "--annotate", tag, "--message", f"Release {version}")
         validate(checkout, tag)
         clean(checkout)
         if state(directory) != (head, remote):
-            raise RuntimeError("Local or remote main changed during validation")
+            raise RuntimeError(
+                f"Local or remote {INTEGRATION_BRANCH} changed during validation"
+            )
         check_available(directory, tag)
         if not dry_run:
             prepared = git(checkout, "rev-parse", "HEAD")
@@ -151,7 +164,9 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
                 prepared,
             )
             if state(directory) != (head, remote):
-                raise RuntimeError("Local or remote main changed during validation")
+                raise RuntimeError(
+                    f"Local or remote {INTEGRATION_BRANCH} changed during validation"
+                )
             git(directory, "merge", "--ff-only", prepared)
             git(
                 directory,
@@ -172,7 +187,8 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         print(f"Prepared {tag} locally; nothing was pushed or published.")
         print(
             f"Push explicitly: git push --atomic origin "
-            f"refs/heads/main:refs/heads/main refs/tags/{tag}:refs/tags/{tag}"
+            f"refs/heads/{INTEGRATION_BRANCH}:refs/heads/{INTEGRATION_BRANCH} "
+            f"refs/tags/{tag}:refs/tags/{tag}"
         )
 
 
@@ -181,17 +197,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("version", nargs="?", default=os.environ.get("VERSION"))
     mode = parser.add_mutually_exclusive_group()
+{% if changelog %}
     mode.add_argument("--notes", action="store_true")
+{% endif %}
     mode.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if not args.version:
         parser.error("Provide a version or set VERSION")
     release_version(f"v{args.version}")
     directory = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
+{% if changelog %}
     if args.notes:
         notes(directory, args.version)
     else:
         prepare(directory, args.version, dry_run=args.dry_run)
+{%- else %}
+    prepare(directory, args.version, dry_run=args.dry_run)
+{%- endif %}
 
 
 if __name__ == "__main__":

@@ -51,10 +51,12 @@ dependencies = [
 dependencies = []
 {%- endif %}
 {%- if docs %}
+{%- if changelog %}
 urls.Changelog = "{{ documentation_url }}/changelog"
+{%- endif %}
 urls.Documentation = "{{ documentation_url }}/"
-{%- else %}
-urls.Changelog = "{{ repository_url }}/blob/main/CHANGELOG.md"
+{%- elif changelog %}
+urls.Changelog = "{{ repository_url }}/blob/{{ integration_branch }}/CHANGELOG.md"
 {%- endif %}
 urls.Homepage = "{{ repository_url }}"
 urls.Issues = "{{ repository_url }}/issues"
@@ -96,7 +98,9 @@ lint = [
 ]
 release = [
   "packaging>=24.2",
+{%- if changelog %}
   "towncrier>=25.8",
+{%- endif %}
   "twine>=6.1",
 ]
 
@@ -234,6 +238,7 @@ report.show_missing = true
 html.show_contexts = true
 html.skip_covered = false
 
+{% if changelog -%}
 [tool.towncrier]
 name = "{{ project_name }}"
 directory = "changelog.d"
@@ -250,3 +255,4 @@ type = [
   { directory = "changed", name = "Changed", showcontent = true },
   { directory = "fixed", name = "Fixed", showcontent = true },
 ]
+{% endif -%}

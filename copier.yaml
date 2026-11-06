@@ -24,17 +24,17 @@ _message_after_copy: |
   2. Create an empty Git repository:
 
      $ git init
-     $ git branch -M main
+     $ git branch -M {{ integration_branch }}
 
   3. Add your GitHub repository to remotes:
 
      $ git remote add origin {{ repository_url }}.git
 
-  4. Push your main branch to GitHub:
+  4. Push your integration branch to GitHub:
 
      $ git add .
      $ git commit -m "Initial commit"
-     $ git push -u origin main
+     $ git push -u origin {{ integration_branch }}
 
 project_name:
   type: str
@@ -59,6 +59,30 @@ package_name:
 project_description:
   type: str
   help: Your project description?
+
+integration_branch:
+  type: str
+  help: What is the integration branch name?
+  default: master
+  validator: >-
+    {% set allowed = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._/' %}
+    {% set invalid = namespace(value=false) %}
+    {% for component in integration_branch.split('/') %}
+    {% if component.startswith('.') or component.endswith('.lock') %}
+    {% set invalid.value = true %}
+    {% endif %}
+    {% endfor %}
+    {% if not integration_branch or integration_branch == 'HEAD'
+       or integration_branch | select('in', allowed) | list | length != integration_branch | length
+       or integration_branch.startswith(('-', '/', '.')) or integration_branch.endswith(('/', '.'))
+       or '..' in integration_branch or '//' in integration_branch or invalid.value %}
+    Enter a valid Git branch name using letters, numbers, hyphens, underscores, dots, and slashes.
+    {% endif %}
+
+changelog:
+  type: bool
+  help: Use a changelog and Towncrier?
+  default: true
 
 target_python:
   type: str

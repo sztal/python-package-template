@@ -45,6 +45,8 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
         },
         {"entry_points": ["cli"], "cli": "click", "install": "uv pip"},
         {"features": ["docs"]},
+        {"integration_branch": "develop", "changelog": False},
+        {"integration_branch": "release/stable", "changelog": False, "features": []},
         {
             "features": ["tasks", "docs", "doctest"],
             "doctest": ["docstrings", "docs", "readme"],
@@ -58,6 +60,8 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
         "src-namespace-cli-doctests",
         "click",
         "docs-only",
+        "no-changelog-docs",
+        "no-changelog-no-docs",
         "doctests",
     ),
 )
@@ -143,6 +147,113 @@ def test_rendered_tooling_is_complete(
     assert "workflow_dispatch" in events
     assert "branches" not in events["push"]
     assert "scripts.release --dry-run" in (project / "RELEASING.md").read_text()
+
+
+def test_generated_branch_and_changelog(
+    generated: tuple[Path, dict[str, object]],
+) -> None:
+    """Keep changelog support and branch references consistent."""
+    project, data = generated
+    with (project / "pyproject.toml").open("rb") as stream:
+        config = tomllib.load(stream)
+    has_changelog = data.get("changelog", True)
+    assert (project / "CHANGELOG.md").exists() is has_changelog
+    assert (project / "changelog.d").exists() is has_changelog
+    assert ("towncrier" in config["tool"]) is has_changelog
+    assert (
+        "towncrier>=25.8" in config["dependency-groups"]["release"]
+    ) is has_changelog
+    assert ("Changelog" in config["project"]["urls"]) is has_changelog
+    if "docs" in data.get("features", ["tasks", "docs"]):
+        assert (project / "docs/changelog.md").exists() is has_changelog
+    release_workflow = yaml.safe_load(
+        (project / ".github/workflows/release.yaml").read_text()
+    )
+    branch = data.get("integration_branch", "master")
+    ci = yaml.safe_load((project / ".github/workflows/ci.yaml").read_text())
+    assert ci[True]["push"]["branches"] == [branch]
+    assert release_workflow["jobs"]["resolve"]["steps"][0]["with"]["ref"] == branch
+    assert (
+        f'INTEGRATION_BRANCH = "{branch}"'
+        in (project / "scripts/release.py").read_text()
+    )
+    assert "INTEGRATION_BRANCH" in (project / "scripts/publish.py").read_text()
+    merge_skill = (project / ".github/skills/merge-branch/SKILL.md").read_text()
+    if has_changelog:
+        assert f"merge into `{branch}`" in merge_skill
+        assert "commit messages and Git history" in merge_skill
+        assert (
+            "--notes-file" in (project / ".github/workflows/release.yaml").read_text()
+        )
+    else:
+        assert "do not create fragments" in merge_skill
+        assert (
+            "--generate-notes"
+            in (project / ".github/workflows/release.yaml").read_text()
+        )
+
+
+@pytest.mark.parametrize("changelog", [True, False])
+def test_generated_release_tools(
+    tmp_path: Path, template_source: Path, *, changelog: bool
+) -> None:
+    """Exercise release preparation with and without Towncrier on a custom branch."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "user_name": "Test User",
+            "user_email": "test@example.invalid",
+            "integration_branch": "release/stable",
+            "changelog": changelog,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            "/dev/null",
+            "tests/test_release_tools.py",
+            "-q",
+        ],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "branch",
+    ["", "HEAD", "-bad", "bad..branch", "bad/.hidden", "bad.lock", "bad'branch"],
+)
+def test_invalid_integration_branch_is_rejected(
+    tmp_path: Path, template_source: Path, branch: str
+) -> None:
+    """Reject names that cannot safely be used as Git refs and workflow input."""
+    with pytest.raises(ValueError, match="valid Git branch name"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "example-package",
+                "project_description": "Example package",
+                "user_name": "Test User",
+                "user_email": "test@example.invalid",
+                "integration_branch": branch,
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
 
 
 def package_locations(data: dict[str, object]) -> tuple[str, str]:

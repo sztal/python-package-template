@@ -19,10 +19,17 @@ after inspecting what it changes and validating its prerequisites.
 2. Review the final integrated changes against the target, including tests,
    documentation, and migrations. Resolve conflicts in the source branch
    only when authorized; never reset or force-update the target.
-3. Follow the repository's changelog policy. Where Towncrier is configured,
-   record concise user-visible changes in the configured fragment categories
-   and naming format, unless the project has a merge helper that does this.
-   Do not add fragments for changes the policy excludes.
+{% if changelog -%}
+3. Only when a merge into `{{ integration_branch }}` has been explicitly
+   requested, inspect the incoming
+   branch's commit messages and Git history not yet in the target (for example,
+   `git log {{ integration_branch }}..SOURCE`), then add
+   concise Towncrier fragments for its user-visible changes using the configured
+   categories and naming format. Do not add fragments for individual commits,
+   merges into other branches, or changes the policy excludes.
+{% else -%}
+3. This project does not use a changelog or Towncrier; do not create fragments.
+{% endif -%}
 4. Run the relevant tests, lint, and other required project checks on the
    integrated result. Report failures or conflicts; do not bypass checks.
 

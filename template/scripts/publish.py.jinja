@@ -11,11 +11,11 @@ import uuid
 from pathlib import Path
 
 from scripts.distributions import release_version
-from scripts.release import git
+from scripts.release import INTEGRATION_BRANCH, git
 
 
 def resolve(directory: Path, tag: str) -> tuple[str, bool]:
-    """Verify that the remote annotated tag points to main history."""
+    """Verify that the remote annotated tag points to integration branch history."""
     version = release_version(tag)
     ref = f"refs/tags/{tag}"
     if git(directory, "cat-file", "-t", ref) != "tag":
@@ -28,15 +28,21 @@ def resolve(directory: Path, tag: str) -> tuple[str, bool]:
         raise ValueError("Remote tag differs from the local tag")
     commit = git(directory, "rev-parse", ref + "^{commit}")
     remote_main = git(
-        directory, "ls-remote", "--exit-code", "origin", "refs/heads/main"
+        directory,
+        "ls-remote",
+        "--exit-code",
+        "origin",
+        f"refs/heads/{INTEGRATION_BRANCH}",
     ).split()[0]
     result = subprocess.run(
         ["git", "merge-base", "--is-ancestor", commit, remote_main], cwd=directory
     )
     if result.returncode:
-        raise ValueError("Tag is not on remote main history; fetch and verify it")
+        raise ValueError(
+            f"Tag is not on remote {INTEGRATION_BRANCH} history; fetch and verify it"
+        )
     return commit, version.is_prerelease
-
+{% if changelog %}
 
 def notes(directory: Path, tag: str) -> str:
     """Read final release notes, or preview pending notes for a candidate."""
@@ -69,7 +75,7 @@ def notes(directory: Path, tag: str) -> str:
             )
             return "\n".join(lines[index:end]).strip() + "\n"
     raise ValueError(f"No changelog section for {version}")
-
+{% endif %}
 
 def gh_json(*args: str) -> object:
     """Read a JSON result from GitHub CLI."""
@@ -88,7 +94,7 @@ def dispatch(tag: str) -> None:
             "run",
             "release.yaml",
             "--ref",
-            "main",
+            "{{ integration_branch }}",
             "-f",
             f"tag={tag}",
             "-f",
@@ -132,7 +138,9 @@ def main() -> None:
     parser.add_argument("tag", nargs="?", default=os.environ.get("TAG"))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--resolve", action="store_true")
+{% if changelog %}
     mode.add_argument("--notes-file", type=Path)
+{% endif %}
     args = parser.parse_args()
     if not args.tag:
         parser.error("Provide a tag or set TAG")
@@ -148,11 +156,13 @@ def main() -> None:
             with Path(output).open("a") as stream:
                 stream.write(result)
         print(result, end="")
+{% if changelog %}
     elif args.notes_file:
         commit = git(directory, "rev-parse", f"refs/tags/{args.tag}" + "^{commit}")
         if git(directory, "rev-parse", "HEAD") != commit:
             raise ValueError("Release notes must be generated at the tagged commit")
         args.notes_file.write_text(notes(directory, args.tag))
+{% endif %}
     else:
         dispatch(args.tag)
 

@@ -3,7 +3,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['{{ integration_branch }}']
   pull_request: null
   workflow_dispatch: null
 
@@ -21,7 +21,7 @@ jobs:
       ref: {% raw %}${{ github.sha }}{% endraw %}
 {% if docs %}
   pages:
-    if: {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}{% endraw %}
+    if: {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/{% endraw %}{{ integration_branch }}{% raw %}' }}{% endraw %}
     needs: checks
     uses: ./.github/workflows/pages.yaml
     with:

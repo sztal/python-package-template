@@ -1,4 +1,7 @@
-.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release-notes release publish
+.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release publish
+{% if changelog %}
+.PHONY: release-notes
+{% endif %}
 {% if tasks == "nox" %}
 .PHONY: nox
 {% endif %}
@@ -32,7 +35,9 @@ help:
 {% endif %}
 	@echo "  check          Run source and distribution checks"
 	@echo "  check-dist     Validate distributions; optionally set TAG=vX.Y.Z"
+{% if changelog %}
 	@echo "  release-notes  Preview notes for VERSION=X.Y.Z"
+{% endif %}
 	@echo "  release        Prepare VERSION locally without publishing"
 	@echo "  publish        Explicitly publish an existing remote TAG"
 
@@ -111,9 +116,11 @@ check:
 check-dist:
 	uv run --group release python -m scripts.distributions check
 
+{% if changelog %}
 release-notes:
 	uv run --group release python -m scripts.release --notes
 
+{% endif %}
 release:
 	uv run --group release python -m scripts.release
 

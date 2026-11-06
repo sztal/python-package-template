@@ -21,8 +21,8 @@ destination and version. Do not infer the version from commit messages.
    preserve existing work. Check the intended branch against its remote and
    ensure the version, tag, and any temporary release branch do not already
    exist. Stop on discrepancies rather than overwriting or moving refs.
-3. Run the required tests and checks, preview release notes using the
-   configured changelog tool, and build and inspect the sdist and wheel using
+3. Run the required tests and checks,{% if changelog %} preview release notes using the
+   configured changelog tool,{% endif %} and build and inspect the sdist and wheel using
    the `build-package` skill. For a tag-derived version, distinguish a
    development build from an artifact built at the release tag; verify the
    release artifact metadata matches that tag.
@@ -33,7 +33,8 @@ destination and version. Do not infer the version from commit messages.
 ## Release
 
 Only perform the authorized release stage. Read `RELEASING.md` for the
-generated workflow. `make release-notes VERSION=1.2.0` previews notes;
+generated workflow. {% if changelog %}`make release-notes VERSION=1.2.0` previews notes;
+{% endif -%}
 `uv run --group release python -m scripts.release --dry-run 1.2.0` rehearses
 in an isolated clone. `make release VERSION=1.2.0` prepares a validated
 commit and annotated tag locally without pushing or publishing.

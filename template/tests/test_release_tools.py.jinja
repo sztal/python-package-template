@@ -20,13 +20,16 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-config"))
     project = tmp_path / "project"
     project.mkdir()
-    release.git(project, "init", "-q", "--initial-branch=main")
+    release.git(project, "init", "-q", "--initial-branch={{ integration_branch }}")
     release.git(project, "config", "user.name", "Release Test")
     release.git(project, "config", "user.email", "release@example.invalid")
     (project / "uv.lock").write_text("lock\n")
+    (project / "tracked.txt").write_text("initial\n")
+{% if changelog %}
     (project / "CHANGELOG.md").write_text("# Changelog\n")
     (project / "changelog.d").mkdir()
     (project / "changelog.d/+test.added.md").write_text("A change.\n")
+{% endif %}
     release.git(project, "add", ".")
     release.git(project, "commit", "-qm", "Initial commit")
     remote = tmp_path / "remote.git"
@@ -55,9 +58,9 @@ def test_release_requires_completely_clean_worktree(
     if kind == "untracked":
         (repository / "untracked").write_text("change")
     else:
-        (repository / "CHANGELOG.md").write_text("change")
+        (repository / "tracked.txt").write_text("change")
         if kind == "staged":
-            release.git(repository, "add", "CHANGELOG.md")
+            release.git(repository, "add", "tracked.txt")
     with pytest.raises(RuntimeError, match="clean"):
         release.state(repository)
 
@@ -96,14 +99,25 @@ def test_release_rehearsal_preserves_caller(
         assert release.git(directory, "cat-file", "-t", f"refs/tags/{tag}") == "tag"
         checked.append(tag)
 
-    monkeypatch.setattr(release, "notes", lambda *_args: None)
-    monkeypatch.setattr(release, "validate", validate)
+{% if changelog %}    monkeypatch.setattr(release, "notes", lambda *_args: None)
+{% endif %}    monkeypatch.setattr(release, "validate", validate)
     release.prepare(repository, "1.0.0rc1", dry_run=True)
     assert checked == ["v1.0.0rc1"]
     assert release.git(repository, "rev-parse", "HEAD") == head
     assert not release.git(repository, "tag", "--list")
     assert not release.git(repository, "status", "--porcelain")
+{% if not changelog %}
 
+def test_final_release_without_changelog(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    head = release.git(repository, "rev-parse", "HEAD")
+    monkeypatch.setattr(release, "validate", lambda *_args: None)
+    release.prepare(repository, "1.0.0", dry_run=False)
+    assert release.git(repository, "rev-parse", "HEAD") == head
+    assert release.git(repository, "rev-parse", "v1.0.0^{}") == head
+    assert not (repository / "CHANGELOG.md").exists()
+{% endif %}
 
 @pytest.mark.parametrize(
     ("tag", "expected_prerelease"), [("v1.0.0", False), ("v1.0.0rc1", True)]

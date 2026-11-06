@@ -19,6 +19,16 @@ pytest, and coverage configuration.
 Keep changes focused, preserve public behavior unless the task intentionally
 changes it, and add or update tests for behavior changes.
 
+{% if changelog -%}
+Changelog fragments are added only when merging into `{{ integration_branch }}`.
+Review the incoming branch's commit messages and Git history not yet in
+`{{ integration_branch }}` (for example, `git log {{ integration_branch }}..SOURCE`)
+and write fragments describing its user-visible changes.
+Do not add or update fragments for individual changes or commits, or for merges
+into other branches. Towncrier assembles the fragments during release preparation.
+{% else -%}
+This project does not use a changelog or Towncrier.
+{% endif %}
 ## Development notes
 
 Use `wiki/` to record concise, durable development context.
