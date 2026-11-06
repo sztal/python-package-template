@@ -184,8 +184,9 @@ directory:
   coverage, and builds;
 - `docs/` and `zensical.toml`: optional Zensical documentation support;
 - `.github/workflows/`: CI and release workflows;
-- `AGENTS.md` and `.github/skills/`: generated repository context for coding
-  agents, including a first-run inspection checklist;
+- `AGENTS.md` and `.github/skills/`: generated repository context and
+  on-demand workflows for development, audits, wiki notes, package builds,
+  branch integration, and releases, including a first-run inspection checklist;
 - `scripts/release.py`: Towncrier and Git-tag release automation;
 - `LICENSE`, `CHANGELOG.md`, and optional `CODE_OF_CONDUCT.md`.
 

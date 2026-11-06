@@ -17,3 +17,8 @@ reproduction. When writing the ledger, remove entries that are clearly stale or
 already fixed; never delete the file itself. Treat tests that disagree with
 current code as potentially stale unless a stronger source of truth confirms a
 source bug.
+
+Run the applicable lint and focused pytest checks after test changes. Inspect
+the project's test configuration for collected doctests and optional example
+tests; do not assume every project has the same documentation or layout.
+Report checks that are unavailable or fail.

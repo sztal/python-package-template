@@ -12,12 +12,14 @@ have changed and agent guidance may be stale.
 ## First run in a newly generated repository
 
 1. Inspect the complete repository tree and the selected package layout.
-2. Read `pyproject.toml`, `README.md`, `Makefile`, `noxfile.py`, and tests.
+2. Read `pyproject.toml`, `README.md`, tests, and the task, documentation,
+   build, and release configuration that actually exists in this project.
 3. Replace every placeholder in `AGENTS.md` with verified project facts.
 4. Update every skill under `.github/skills/` with the actual paths, commands,
    environment rules, and testing conventions.
 5. Remove assumptions that are not supported by the source tree.
-6. Run `make lint`, `make test`, and the relevant Nox sessions.
+6. Run the applicable documented checks, accounting for optional tools and
+   features. Record unavailable or failing checks rather than inventing them.
 7. Re-read all agent files and confirm they agree with each other.
 
 ## Later updates
