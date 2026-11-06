@@ -73,6 +73,9 @@ values. Important choices include:
   fragments are written at integration-branch merge time from the incoming
   branch's Git history and assembled for releases
 - `target_python`: the Ruff and mypy target, from `py313` through `py315`; the default is `py314`
+- `pytest_testmon`: `no` (default), `manual` to enable `pytest --testmon`,
+  or `automatic` to use testmon by default; coverage targets always disable it
+  when installed so they run the full suite
 - `package_layout`: flat (default) or `src` source layout
 - `package_type`: standard (default) or implicit namespace package; namespace
   packages also require a top-level `namespace_name` that is a Python identifier

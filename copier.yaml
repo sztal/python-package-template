@@ -93,6 +93,15 @@ target_python:
     Python 3.14: py314
     Python 3.15: py315
 
+pytest_testmon:
+  type: str
+  help: Use pytest-testmon to select tests affected by changes?
+  default: "no"
+  choices:
+    No: "no"
+    Manually with --testmon: manual
+    Automatically by default: automatic
+
 user_name:
   type: str
   help: Your name?

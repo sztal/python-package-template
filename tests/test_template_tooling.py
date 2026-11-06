@@ -47,6 +47,8 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
         {"features": ["docs"]},
         {"integration_branch": "develop", "changelog": False},
         {"integration_branch": "release/stable", "changelog": False, "features": []},
+        {"pytest_testmon": "manual"},
+        {"pytest_testmon": "automatic"},
         {
             "features": ["tasks", "docs", "doctest"],
             "doctest": ["docstrings", "docs", "readme"],
@@ -62,6 +64,8 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
         "docs-only",
         "no-changelog-docs",
         "no-changelog-no-docs",
+        "testmon-manual",
+        "testmon-automatic",
         "doctests",
     ),
 )
@@ -134,6 +138,25 @@ def test_rendered_tooling_is_complete(
         "3.15",
     ]
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
+    testmon = data.get("pytest_testmon", "no")
+    assert ("pytest-testmon>=2.3.0" in config["dependency-groups"]["test"]) is (
+        testmon != "no"
+    )
+    assert ("--testmon" in config["tool"]["pytest"]["addopts"]) is (
+        testmon == "automatic"
+    )
+    for target in ("coverage", "coverage-html"):
+        result = subprocess.run(  # noqa: S603
+            [make, "--just-print", target],
+            cwd=project,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        command = next(
+            line for line in result.stdout.splitlines() if "coverage run" in line
+        )
+        assert ("--no-testmon" in command.split()) is (testmon != "no")
     assert "twine>=6.1" in config["dependency-groups"]["release"]
     assert config["tool"]["coverage"]["report"]["fail_under"] == MIN_COVERAGE
     if "docstrings" in data.get("doctest", []):

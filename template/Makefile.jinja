@@ -71,11 +71,11 @@ nox:
 {% endif %}
 
 coverage:
-	uv run coverage run -m pytest
+	uv run coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
 	uv run coverage report
 
 coverage-html:
-	uv run coverage run -m pytest
+	uv run coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
 	uv run coverage html
 
 lint:

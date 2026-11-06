@@ -80,6 +80,9 @@ test = [
   "nox[uv]>=2025.2.9",
 {%- endif %}
   "pytest>=9",
+{%- if pytest_testmon != 'no' %}
+  "pytest-testmon>=2.3.0",
+{%- endif %}
   "pytest-xdist>=3.8",
 ]
 type = [
@@ -176,6 +179,9 @@ addopts = [
   "-ra",
   "-v",
   "--tb=short",
+{%- if pytest_testmon == 'automatic' %}
+  "--testmon",
+{%- endif %}
 {%- if 'readme' in doctest or 'docs' in doctest %}
   "--doctest-glob",
   "*.md",
