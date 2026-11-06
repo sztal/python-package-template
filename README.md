@@ -37,7 +37,7 @@ created and to apply later template changes consistently.
 ## Requirements
 
 - [Git](https://git-scm.com/) 2 or newer
-- [Python](https://www.python.org/) 3.10 or newer
+- [Python](https://www.python.org/) 3.13 or newer
 - [Copier](https://copier.readthedocs.io/) 9.6 or newer
 - [Copier Template-Extensions](https://github.com/copier-org/copier-template-extensions) 0.3.2 or newer
 
@@ -68,7 +68,7 @@ Copier asks for the visible project choices and applies defaults for derived
 values. Important choices include:
 
 - `project_name` and `project_description`: project metadata and documentation
-- `target_python`: the Ruff and mypy target, from `py310` through `py314`; the default is `py314`
+- `target_python`: the Ruff and mypy target, from `py313` through `py315`; the default is `py314`
 - `package_layout`: flat (default) or `src` source layout
 - `package_type`: standard (default) or implicit namespace package; namespace
   packages also require a top-level `namespace_name` that is a Python identifier
@@ -111,6 +111,9 @@ previously built top-level package to use the qualified import name
 `namespace_name.package_name`; update downstream imports and review the
 generated distribution before releasing it. When overriding both the layout
 and namespace name during that update, also set `package_type=namespace`.
+
+Projects using a `target_python` below `py313` must select a supported target
+when updating; generated projects now require Python 3.13 or newer.
 
 ## Template Mechanics
 

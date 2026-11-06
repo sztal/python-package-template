@@ -65,11 +65,9 @@ target_python:
   help: Which Python version should tools target?
   default: py314
   choices:
-    Python 3.10: py310
-    Python 3.11: py311
-    Python 3.12: py312
     Python 3.13: py313
     Python 3.14: py314
+    Python 3.15: py315
 
 user_name:
   type: str

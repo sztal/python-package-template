@@ -19,18 +19,16 @@ maintainers = [
 authors = [
   { name = "{{ user_name }}", email = "{{ user_email }}" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
   "Typing :: Typed",
 ]
@@ -50,7 +48,7 @@ dependencies = [
   "cyclopts>=4",
 ]
 {%- else %}
-dependencies = [  ]
+dependencies = []
 {%- endif %}
 {%- if docs %}
 urls.Changelog = "{{ documentation_url }}/changelog"
@@ -83,7 +81,7 @@ test = [
   "pytest-xdist>=3.8",
 ]
 type = [
-  "mypy>=1.15",
+  "mypy>=1.19",
   { include-group = "test" },
 ]
 {%- if docs == "zensical" %}
@@ -94,7 +92,7 @@ docs = [
 {%- endif %}
 lint = [
   "pre-commit>=4.5",
-  "ruff==0.14.7",
+  "ruff==0.16.4",
 ]
 release = [
   "packaging>=24.2",
@@ -102,19 +100,17 @@ release = [
   "twine>=6.1",
 ]
 
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
-
-[tool.hatch.build.targets.wheel]
-{% if package_type == 'namespace' -%}
-only-include = [
+[tool.hatch]
+version.source = "uv-dynamic-versioning"
+{%- if package_type == 'namespace' %}
+build.targets.wheel.only-include = [
   "{{ package_path.removeprefix('./') }}",
 ]
 {%- if package_layout == 'src' %}
-sources = [ "src" ]
+build.targets.wheel.sources = [ "src" ]
 {%- endif %}
 {%- else %}
-packages = [
+build.targets.wheel.packages = [
   "{{ package_path }}",
 ]
 {%- endif %}
@@ -156,8 +152,22 @@ write-changes = true
 
 [tool.pyproject-fmt]
 
+[tool.mypy]
+{%- if package_type == 'namespace' %}
+mypy_path = "{{ package_root }}"
+explicit_package_bases = true
+{%- endif %}
+python_version = "3.{{ target_python[3:] }}"
+warn_unreachable = true
+enable_error_code = [
+  "ignore-without-code",
+  "redundant-expr",
+  "truthy-bool",
+]
+strict = true
+pretty = true
+
 [tool.pytest]
-minversion = "9.0"
 addopts = [
   "-ra",
   "-v",
@@ -175,6 +185,8 @@ filterwarnings = [
   "error",
 ]
 log_level = "INFO"
+minversion = "9.0"
+strict = true
 testpaths = [
 {%- if 'docs' in doctest %}
   "docs",
@@ -187,15 +199,25 @@ testpaths = [
   "README.md",
 {%- endif %}
 ]
-strict = true
 
 [tool.coverage]
-html.show_contexts = true
-html.skip_covered = false
+run.source_pkgs = [
+  "{{ import_name }}",
+]
+run.omit = [
+  "__main__.py",
+  "setup.py",
+]
+run.branch = true
+run.dynamic_context = "test_function"
+run.patch = [
+  "subprocess",
+]
 paths.source = [
   "{{ package_root }}",
   ".nox/**/site-packages",
 ]
+report.fail_under = 90
 report.exclude_also = [
   "-> [\"']?(Never|NoReturn)[\"']?:",
   "^\\s*(typing\\.)?assert_never\\b",
@@ -207,72 +229,24 @@ report.exclude_also = [
   "^\\s*return NotImplemented\\b",
   "^if __name__ == [\"']__main__[\"']:$",
 ]
-report.fail_under = 90
-report.show_missing = true
 report.skip_covered = true
-run.branch = true
-run.dynamic_context = "test_function"
-run.omit = [
-  "__main__.py",
-  "setup.py",
-]
-run.patch = [
-  "subprocess",
-]
-run.source_pkgs = [
-  "{{ import_name }}",
-]
+report.show_missing = true
+html.show_contexts = true
+html.skip_covered = false
 
 [tool.towncrier]
 name = "{{ project_name }}"
-filename = "CHANGELOG.md"
 directory = "changelog.d"
+filename = "CHANGELOG.md"
 start_string = "<!-- towncrier release notes start -->\n"
-underlines = [ "", "", "" ]
 title_format = "## [{version}]({{ repository_url }}/tree/v{version}) - {project_date}"
 issue_format = "[#{issue}]({{ repository_url }}/issues/{issue})"
-
-[[tool.towncrier.type]]
-directory = "security"
-name = "Security"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "removed"
-name = "Removed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "deprecated"
-name = "Deprecated"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "added"
-name = "Added"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "changed"
-name = "Changed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "fixed"
-name = "Fixed"
-showcontent = true
-
-[tool.mypy]
-python_version = "3.{{ target_python[3:] }}"
-{%- if package_type == 'namespace' %}
-explicit_package_bases = true
-mypy_path = "{{ package_root }}"
-{%- endif %}
-warn_unreachable = true
-enable_error_code = [
-  "ignore-without-code",
-  "redundant-expr",
-  "truthy-bool",
+underlines = [ "", "", "" ]
+type = [
+  { directory = "security", name = "Security", showcontent = true },
+  { directory = "removed", name = "Removed", showcontent = true },
+  { directory = "deprecated", name = "Deprecated", showcontent = true },
+  { directory = "added", name = "Added", showcontent = true },
+  { directory = "changed", name = "Changed", showcontent = true },
+  { directory = "fixed", name = "Fixed", showcontent = true },
 ]
-strict = true
-pretty = true

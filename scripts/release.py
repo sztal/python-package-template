@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.13"
 # dependencies = [
 #   "uv>=0.8.6",
 # ]
@@ -55,7 +55,7 @@ def update_version() -> str:
     version_json = subprocess.check_output(["uv", "version", "--output-format", "json"])
     version = json.loads(version_json)["version"]
 
-    today = datetime.datetime.now(tz=datetime.timezone.utc)
+    today = datetime.datetime.now(tz=datetime.UTC)
     new_version = f"{today.year}.{today.month}.{today.day}"
 
     match = re.match(f"^{VERSION_PATTERN}$", version, re.VERBOSE)

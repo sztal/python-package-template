@@ -6,17 +6,13 @@ import py_compile
 import shutil
 import subprocess
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
 
 import copier
 import pytest
 import yaml
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 MIN_COVERAGE = 90
 
@@ -35,7 +31,7 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture(
     params=[
         {},
-        {"package_layout": "src", "features": []},
+        {"package_layout": "src", "features": [], "target_python": "py315"},
         {"package_type": "namespace", "namespace_name": "example_namespace"},
         {"package_layout": "src", "package_type": "namespace", "features": []},
         {
@@ -116,6 +112,23 @@ def test_rendered_tooling_is_complete(
     )
     with (project / "pyproject.toml").open("rb") as stream:
         config = tomllib.load(stream)
+    target_python = data.get("target_python", "py314")
+    assert isinstance(target_python, str)
+    assert config["tool"]["ruff"]["target-version"] == target_python
+    assert config["tool"]["mypy"]["python_version"] == f"3.{target_python[3:]}"
+    assert config["project"]["requires-python"] == ">=3.13"
+    assert "Programming Language :: Python :: 3.15" in config["project"]["classifiers"]
+    assert (
+        "Programming Language :: Python :: 3.12" not in config["project"]["classifiers"]
+    )
+    checks_workflow = yaml.safe_load(
+        (project / ".github/workflows/checks.yaml").read_text()
+    )
+    assert checks_workflow["jobs"]["tests"]["strategy"]["matrix"]["python_version"] == [
+        "3.13",
+        "3.14",
+        "3.15",
+    ]
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
     assert "twine>=6.1" in config["dependency-groups"]["release"]
     assert config["tool"]["coverage"]["report"]["fail_under"] == MIN_COVERAGE

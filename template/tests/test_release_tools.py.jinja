@@ -129,7 +129,7 @@ def test_distribution_inspection_checks_metadata_and_stale_files(
     root = f"{name}-1.0.0"
     content = (
         f"Metadata-Version: 2.4\nName: {distributions.NAME}\nVersion: 1.0.0\n"
-        "Requires-Python: >=3.10\nLicense-Expression: MIT\n\n"
+        "Requires-Python: >=3.13\nLicense-Expression: MIT\n\n"
     ).encode()
     wheel = tmp_path / f"{root}-py3-none-any.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
