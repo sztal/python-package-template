@@ -39,7 +39,6 @@ dependencies = [
   "copier>=9.6",
   "copier-template-extensions>=0.3.2",
 ]
-urls.Changelog = "https://github.com/sztal/python-package-template/blob/main/CHANGELOG.md"
 urls.Documentation = "https://github.com/sztal/python-package-template/tree/main/docs"
 urls.Homepage = "https://github.com/sztal/python-package-template"
 urls.Issues = "https://github.com/sztal/python-package-template/issues"
@@ -48,15 +47,16 @@ urls.Repository = "https://github.com/sztal/python-package-template"
 [dependency-groups]
 dev = [
   { include-group = "lint" },
-  { include-group = "release" },
   { include-group = "test" },
   { include-group = "type" },
 ]
 test = [
   "coverage[toml]>=7.11",
+  "hatchling>=1.27",
   "pytest>=9",
   "pytest-xdist>=3.8",
   "tomli>=2; python_version<'3.11'",
+  "uv-dynamic-versioning>=0.14",
 ]
 type = [
   "mypy>=1.19",
@@ -67,9 +67,6 @@ docs = [
 ]
 lint = [
   "pre-commit>=4.5",
-]
-release = [
-  "towncrier>=25.8",
 ]
 
 [tool.ruff]
@@ -107,45 +104,6 @@ testpaths = [
   "tests",
 ]
 strict = true
-
-[tool.towncrier]
-name = "python-package-template"
-filename = "CHANGELOG.md"
-directory = "changelog.d"
-start_string = "<!-- towncrier release notes start -->\n"
-underlines = [ "", "", "" ]
-title_format = "## [{version}](https://github.com/sztal/python-package-template/tree/v{version})"
-issue_format = "[#{issue}](https://github.com/sztal/python-package-template/issues/{issue})"
-
-[[tool.towncrier.type]]
-directory = "security"
-name = "Security"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "removed"
-name = "Removed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "deprecated"
-name = "Deprecated"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "added"
-name = "Added"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "changed"
-name = "Changed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "fixed"
-name = "Fixed"
-showcontent = true
 
 [tool.mypy]
 python_version = "3.10"

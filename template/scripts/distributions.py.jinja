@@ -21,7 +21,8 @@ from packaging.utils import (
 from packaging.version import Version
 
 NAME = "{{ distribution_name }}"
-IMPORT_NAME = "{{ package_name }}"
+IMPORT_NAME = "{{ import_name }}"
+WHEEL_PATH = IMPORT_NAME.replace(".", "/")
 SOURCE_PATH = "{{ package_path }}".removeprefix("./")
 TAG_PATTERN = re.compile(
     r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:(?:a|b|rc)(?:0|[1-9]\d*))?"
@@ -64,7 +65,7 @@ def metadata(path: Path) -> Message:
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
             entries = [name for name in names if name.endswith(".dist-info/METADATA")]
-            required = {f"{IMPORT_NAME}/__init__.py", f"{IMPORT_NAME}/py.typed"}
+            required = {f"{WHEEL_PATH}/__init__.py", f"{WHEEL_PATH}/py.typed"}
             if len(entries) != 1 or not required.issubset(names):
                 raise ValueError(f"{path.name} is missing package files or metadata")
             if not any(".dist-info/licenses/" in name for name in names):

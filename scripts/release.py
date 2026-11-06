@@ -1,7 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "towncrier>=25.8",
 #   "uv>=0.8.6",
 # ]
 # ///
@@ -79,23 +78,6 @@ def get_current_branch() -> str:
     ).rstrip()
 
 
-def get_release_notes(version: str) -> str:
-    """Return the release notes."""
-    release_notes = subprocess.check_output(
-        ["towncrier", "build", "--version", version, "--draft"],
-        stderr=subprocess.DEVNULL,
-        text=True,
-    ).rstrip()
-    release_notes = "".join(release_notes.splitlines(keepends=True)[1:])
-    release_notes = release_notes.strip()
-    return f"## Release notes\n\n{release_notes}"
-
-
-def update_changelog(version: str) -> None:
-    """Update the changelog."""
-    subprocess.check_call(["towncrier", "build", "--version", version, "--yes"])
-
-
 def create_release_tag(version: str) -> str:
     """Create and return the release tag."""
     release_tag = f"v{version}"
@@ -107,11 +89,9 @@ def create_release_tag(version: str) -> str:
     return release_tag
 
 
-def create_release(release_tag: str, release_notes: str) -> None:
-    """Create the GitHub release with release notes."""
-    subprocess.check_call(
-        ["gh", "release", "create", release_tag, "--notes", release_notes]
-    )
+def create_release(release_tag: str) -> None:
+    """Create a GitHub release with automatically generated notes."""
+    subprocess.check_call(["gh", "release", "create", release_tag, "--generate-notes"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -132,10 +112,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         # Create the release branch and switch to it.
         subprocess.check_call(["git", "switch", "--create", release_branch])
-
-        # Update the changelog.
-        release_notes = get_release_notes(version)
-        update_changelog(version)
 
         # Add all changes as the local repository was clean.
         subprocess.check_call(["git", "add", "--all", "."])
@@ -159,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
         # Create the GitHub release.
-        create_release(release_tag, release_notes)
+        create_release(release_tag)
 
     finally:
         # Switch back to the base Git branch.

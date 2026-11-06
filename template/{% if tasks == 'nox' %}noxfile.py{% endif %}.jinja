@@ -103,10 +103,13 @@ def typecheck(session: nox.Session) -> None:
         session=session,
     )
 {%- endif %}
-    session.run(
-        "mypy",
-        *(session.posargs or ("{{ package_path }}", "tests", "scripts", "noxfile.py")),
+    paths = (
+        "{{ package_path }}",
+        "tests",
+        "scripts",
+        "noxfile.py",
     )
+    session.run("mypy", *(session.posargs or paths))
 
 {% if docs %}
 @nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"])

@@ -62,9 +62,9 @@ urls.Homepage = "{{ repository_url }}"
 urls.Issues = "{{ repository_url }}/issues"
 urls.Repository = "{{ repository_url }}"
 {% if cli == 'typer' or cli == 'cyclopts' -%}
-scripts.{{ distribution_name }} = "{{ package_name }}.cli:app"
+scripts.{{ distribution_name }} = "{{ import_name }}.cli:app"
 {% elif cli -%}
-scripts.{{ distribution_name }} = "{{ package_name }}.cli:main"
+scripts.{{ distribution_name }} = "{{ import_name }}.cli:main"
 {% endif %}
 [dependency-groups]
 dev = [
@@ -106,9 +106,18 @@ release = [
 source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.wheel]
+{% if package_type == 'namespace' -%}
+only-include = [
+  "{{ package_path.removeprefix('./') }}",
+]
+{%- if package_layout == 'src' %}
+sources = [ "src" ]
+{%- endif %}
+{%- else %}
 packages = [
   "{{ package_path }}",
 ]
+{%- endif %}
 
 [tool.ruff]
 target-version = "{{ target_python }}"
@@ -137,7 +146,7 @@ lint.per-file-ignores."tests/**" = [
   "S101", # using assert is okay in tests
 ]
 lint.isort.known-first-party = [
-  "{{ package_name }}",
+  "{{ namespace_name if package_type == 'namespace' else package_name }}",
 ]
 lint.pydocstyle.convention = "numpy"
 lint.future-annotations = true
@@ -211,7 +220,7 @@ run.patch = [
   "subprocess",
 ]
 run.source_pkgs = [
-  "{{ package_name }}",
+  "{{ import_name }}",
 ]
 
 [tool.towncrier]
@@ -255,6 +264,10 @@ showcontent = true
 
 [tool.mypy]
 python_version = "3.{{ target_python[3:] }}"
+{%- if package_type == 'namespace' %}
+explicit_package_bases = true
+mypy_path = "{{ package_root }}"
+{%- endif %}
 warn_unreachable = true
 enable_error_code = [
   "ignore-without-code",

@@ -6,6 +6,7 @@ import py_compile
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import copier
@@ -33,9 +34,19 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(
     params=[
-        {"package_layout": "flat"},
+        {},
         {"package_layout": "src", "features": []},
-        {"package_layout": "namespace", "namespace_name": "example_namespace"},
+        {"package_type": "namespace", "namespace_name": "example_namespace"},
+        {"package_layout": "src", "package_type": "namespace", "features": []},
+        {
+            "package_layout": "src",
+            "package_type": "namespace",
+            "namespace_name": "example_namespace",
+            "entry_points": ["cli"],
+            "cli": "click",
+            "features": ["tasks", "docs", "doctest"],
+            "doctest": ["docstrings", "docs", "readme"],
+        },
         {"entry_points": ["cli"], "cli": "click", "install": "uv pip"},
         {"features": ["docs"]},
         {
@@ -43,7 +54,16 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
             "doctest": ["docstrings", "docs", "readme"],
         },
     ],
-    ids=("flat", "src-no-options", "namespace", "click", "docs-only", "doctests"),
+    ids=(
+        "flat-standard-default",
+        "src-standard-no-options",
+        "flat-namespace",
+        "src-namespace-default-name",
+        "src-namespace-cli-doctests",
+        "click",
+        "docs-only",
+        "doctests",
+    ),
 )
 def generated(
     tmp_path: Path, template_source: Path, request: pytest.FixtureRequest
@@ -99,8 +119,9 @@ def test_rendered_tooling_is_complete(
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
     assert "twine>=6.1" in config["dependency-groups"]["release"]
     assert config["tool"]["coverage"]["report"]["fail_under"] == MIN_COVERAGE
-    if "doctest" in features:
-        assert "./example_package" in config["tool"]["pytest"]["testpaths"]
+    if "docstrings" in data.get("doctest", []):
+        source, _ = package_locations(data)
+        assert source in config["tool"]["pytest"]["testpaths"]
         assert "." not in config["tool"]["pytest"]["testpaths"]
     release_workflow = yaml.safe_load(
         (project / ".github/workflows/release.yaml").read_text()
@@ -111,6 +132,134 @@ def test_rendered_tooling_is_complete(
     assert "scripts.release --dry-run" in (project / "RELEASING.md").read_text()
 
 
+def package_locations(data: dict[str, object]) -> tuple[str, str]:
+    """Return the expected source path and import name for a generated project."""
+    root = "src" if data.get("package_layout") == "src" else "."
+    if data.get("package_type") == "namespace":
+        namespace = data.get("namespace_name", "example_package")
+        return f"{root}/{namespace}/example_package", f"{namespace}.example_package"
+    return f"{root}/example_package", "example_package"
+
+
+def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> None:
+    """Keep package paths, imports, and build settings consistent."""
+    project, data = generated
+    source, import_name = package_locations(data)
+    assert (project / source / "__init__.py").is_file()
+    assert (project / source / "py.typed").is_file()
+    if data.get("package_type") == "namespace":
+        assert not (project / Path(source).parent / "__init__.py").exists()
+    with (project / "pyproject.toml").open("rb") as stream:
+        config = tomllib.load(stream)
+    wheel = config["tool"]["hatch"]["build"]["targets"]["wheel"]
+    if data.get("package_type") == "namespace":
+        assert wheel["only-include"] == [source.removeprefix("./")]
+        assert wheel.get("sources", []) == (
+            ["src"] if data.get("package_layout") == "src" else []
+        )
+        assert config["tool"]["mypy"]["explicit_package_bases"]
+        assert config["tool"]["mypy"]["mypy_path"] == (
+            "src" if data.get("package_layout") == "src" else "."
+        )
+    else:
+        assert wheel["packages"] == [source]
+    assert config["tool"]["coverage"]["run"]["source_pkgs"] == [import_name]
+    assert (
+        f"from {import_name} import __version__"
+        in (project / "tests/test_version.py").read_text()
+    )
+    assert (
+        f'IMPORT_NAME = "{import_name}"'
+        in (project / "scripts/distributions.py").read_text()
+    )
+    if "cli" in data.get("entry_points", []):
+        assert config["project"]["scripts"]["example-package"].startswith(
+            f"{import_name}.cli:"
+        )
+        assert (
+            f"from {import_name}.cli import "
+            in (project / "tests/test_cli.py").read_text()
+        )
+    if "docs" in data.get("features", ["tasks", "docs"]):
+        assert f"::: {import_name}" in (project / "docs/reference/api.md").read_text()
+
+
+def test_built_wheel_preserves_import_path(
+    generated: tuple[Path, dict[str, object]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Build and import the actual wheel without leaking namespace siblings."""
+    project, data = generated
+    source, import_name = package_locations(data)
+    if data.get("package_type") == "namespace":
+        sibling = project / Path(source).parent / "unrelated_package"
+        sibling.mkdir()
+        (sibling / "__init__.py").write_text("")
+    monkeypatch.setenv("UV_DYNAMIC_VERSIONING_BYPASS", "1.2.3")
+    subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "hatchling", "build", "-t", "wheel"],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    (wheel,) = (project / "dist").glob("*.whl")
+    with zipfile.ZipFile(wheel) as archive:
+        names = set(archive.namelist())
+    wheel_path = import_name.replace(".", "/")
+    assert f"{wheel_path}/__init__.py" in names
+    assert f"{wheel_path}/py.typed" in names
+    if data.get("package_type") == "namespace":
+        namespace = data.get("namespace_name", "example_package")
+        assert f"{namespace}/__init__.py" not in names
+        assert f"{namespace}/unrelated_package/__init__.py" not in names
+    installed = project / "installed"
+    shutil.unpack_archive(wheel, installed, "zip")
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            (
+                "import importlib, sys; sys.path.insert(0, sys.argv[1]); "
+                "module = importlib.import_module(sys.argv[2]); "
+                "assert module.__version__ == '1.2.3'"
+            ),
+            str(installed),
+            import_name,
+        ],
+        cwd=project.parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if data.get("package_type") == "namespace":
+        namespace = data.get("namespace_name", "example_package")
+        other_install = project / "other-install"
+        other_package = other_install / str(namespace) / "other_package"
+        other_package.mkdir(parents=True)
+        (other_package / "__init__.py").write_text("")
+        subprocess.run(  # noqa: S603
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                (
+                    "import importlib, sys; sys.path[:0] = sys.argv[1:3]; "
+                    "importlib.import_module(sys.argv[3]); "
+                    "importlib.import_module(sys.argv[4])"
+                ),
+                str(installed),
+                str(other_install),
+                import_name,
+                f"{namespace}.other_package",
+            ],
+            cwd=project.parent,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+
 def test_generated_agent_guide_uses_selected_layout(
     generated: tuple[Path, dict[str, object]],
 ) -> None:
@@ -119,10 +268,138 @@ def test_generated_agent_guide_uses_selected_layout(
     guide = (project / "AGENTS.md").read_text()
     assert "{{" not in guide
     assert "{%" not in guide
-    layout = data.get("package_layout", "flat")
-    source = {
-        "flat": "./example_package/",
-        "src": "src/example_package/",
-        "namespace": "example_namespace/example_package/",
-    }[layout]
-    assert source in guide
+    source, import_name = package_locations(data)
+    assert f"{source}/" in guide
+    assert f"Import package: `{import_name}`" in guide
+
+
+@pytest.mark.parametrize("cli", ["argparse", "click", "typer", "cyclopts"])
+def test_namespaced_cli_imports(
+    tmp_path: Path, template_source: Path, cli: str
+) -> None:
+    """Every CLI framework uses the qualified namespace import."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "user_name": "Test User",
+            "user_email": "test@example.invalid",
+            "github_user": "example",
+            "package_layout": "src",
+            "package_type": "namespace",
+            "namespace_name": "example_namespace",
+            "entry_points": ["cli"],
+            "cli": cli,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    py_compile.compile(str(project / "tests/test_cli.py"), doraise=True)
+    assert (
+        "from example_namespace.example_package.cli import"
+        in (project / "tests/test_cli.py").read_text()
+    )
+    with (project / "pyproject.toml").open("rb") as stream:
+        config = tomllib.load(stream)
+    assert config["project"]["scripts"]["example-package"].startswith(
+        "example_namespace.example_package.cli:"
+    )
+    if cli == "click":
+        source = project / "src/example_namespace/example_package/cli.py"
+        assert '@click.version_option(package_name="example-package")' in (
+            source.read_text()
+        )
+
+
+@pytest.mark.parametrize("namespace", ["", "not-valid", "a.b", "123", "class"])
+def test_invalid_namespace_is_rejected(
+    tmp_path: Path, template_source: Path, namespace: str
+) -> None:
+    """Reject namespace names that cannot appear in Python import statements."""
+    with pytest.raises(ValueError, match="valid Python identifier"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "example-package",
+                "project_description": "Example package",
+                "user_name": "Test User",
+                "user_email": "test@example.invalid",
+                "github_user": "example",
+                "package_type": "namespace",
+                "namespace_name": namespace,
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
+
+
+@pytest.mark.parametrize("layout", ["flat", "src"])
+@pytest.mark.parametrize("namespace", ["tests", "scripts"])
+def test_namespace_cannot_shadow_generated_packages(
+    tmp_path: Path, template_source: Path, namespace: str, layout: str
+) -> None:
+    """Namespaces must not collide with generated regular packages."""
+    with pytest.raises(ValueError, match="conflicts with a generated"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "example-package",
+                "project_description": "Example package",
+                "user_name": "Test User",
+                "user_email": "test@example.invalid",
+                "github_user": "example",
+                "package_layout": layout,
+                "package_type": "namespace",
+                "namespace_name": namespace,
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
+
+
+@pytest.mark.parametrize("layout", ["flat", "src"])
+def test_legacy_namespace_answers_migrate_on_recopy(
+    tmp_path: Path, template_source: Path, layout: str
+) -> None:
+    """Preserve the old namespace choice while splitting the two questions."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "user_name": "Test User",
+            "user_email": "test@example.invalid",
+            "github_user": "example",
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    answer_file = project / ".copier-answers.yml"
+    answers = yaml.safe_load(answer_file.read_text())
+    answers["package_layout"] = "namespace"
+    answers["namespace_name"] = "example_namespace"
+    del answers["package_type"]
+    answer_file.write_text(yaml.safe_dump(answers))
+    data = {"package_layout": layout} if layout == "src" else None
+    copier.run_recopy(
+        project, data=data, defaults=True, overwrite=True, unsafe=True, quiet=True
+    )
+    migrated = yaml.safe_load(answer_file.read_text())
+    assert migrated["package_layout"] == layout
+    assert migrated["package_type"] == "namespace"
+    assert migrated["namespace_name"] == "example_namespace"
+    prefix = "src/" if layout == "src" else ""
+    assert (
+        project / f"{prefix}example_namespace/example_package/__init__.py"
+    ).is_file()

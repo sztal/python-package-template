@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import keyword
 import re
 import unicodedata
 from typing import TYPE_CHECKING
@@ -21,6 +22,11 @@ def slugify(string: str, separator: str = "-") -> str:
     return re.sub(r"[-_\s]+", separator, string).strip("-_")
 
 
+def python_identifier(string: str) -> bool:
+    """Check that a name can be used as a Python identifier."""
+    return string.isidentifier() and not keyword.iskeyword(string)
+
+
 class SlugifyExtension(Extension):
     """An extension to create slugs from strings."""
 
@@ -28,3 +34,4 @@ class SlugifyExtension(Extension):
         """Initialize the extension."""
         super().__init__(environment)
         environment.filters["slugify"] = slugify
+        environment.filters["python_identifier"] = python_identifier

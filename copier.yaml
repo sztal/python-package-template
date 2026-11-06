@@ -134,6 +134,15 @@ dynamic_version:
   default: true
   when: false
 
+legacy_namespace_layout:
+  type: bool
+  help: Whether the previous answer used the legacy namespace layout.
+  default: >-
+    {{ (package_layout | default('')) == 'namespace' or
+       ('namespace_name' in _copier_answers and 'package_type' not in _copier_answers
+        and 'namespace_name' not in _copier_conf.data) }}
+  when: false
+
 package_layout:
   type: str
   help: Which package layout do you want to use?
@@ -141,29 +150,51 @@ package_layout:
   choices:
     Flat package: flat
     Source package: src
+  validator: >-
+    {% if package_layout not in ['flat', 'src'] %}
+    Choose either flat or src.
+    {% endif %}
+
+package_type:
+  type: str
+  help: What kind of package do you want to create?
+  default: "{{ 'namespace' if legacy_namespace_layout else 'standard' }}"
+  choices:
+    Standard package: standard
     Namespace package: namespace
+  validator: >-
+    {% if package_type not in ['standard', 'namespace'] %}
+    Choose either standard or namespace.
+    {% endif %}
 
 namespace_name:
   type: str
   help: What is the top-level namespace name?
   default: "{{ package_name }}"
-  when: "{{ package_layout == 'namespace' }}"
+  when: "{{ package_type == 'namespace' }}"
   validator: >-
-    {% if namespace_name == '' %}
-    The namespace name is required.
+    {% if not (namespace_name | python_identifier) %}
+    The namespace name must be a valid Python identifier and not a keyword.
+    {% elif namespace_name in ['tests', 'scripts'] %}
+    This namespace conflicts with a generated top-level package; choose another name.
     {% endif %}
 
 package_root:
   type: str
   help: The package source root.
-  default: >-
-    {% if package_layout == 'src' %}src{% elif package_layout == 'namespace' %}{{ namespace_name }}{% else %}.{% endif %}
+  default: "{{ 'src' if package_layout == 'src' else '.' }}"
   when: false
 
 package_path:
   type: str
   help: The package path.
-  default: "{{ package_root }}/{{ package_name }}"
+  default: "{{ package_root }}/{{ (namespace_name ~ '/') if package_type == 'namespace' else '' }}{{ package_name }}"
+  when: false
+
+import_name:
+  type: str
+  help: The fully qualified import name.
+  default: "{{ (namespace_name ~ '.') if package_type == 'namespace' else '' }}{{ package_name }}"
   when: false
 
 code_of_conduct:
