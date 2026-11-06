@@ -1,0 +1,48 @@
+---
+name: Publish documentation
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: {% raw %}${{ steps.deployment.outputs.page_url }}{% endraw %}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: {% raw %}${{ inputs.ref }}{% endraw %}
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/download-artifact@v5
+        with:
+          name: coverage-data
+      - name: Build documentation and coverage
+        run: |
+          uv sync --locked --group docs --group test
+          uv run --no-sync coverage json --data-file=coverage-data -o coverage.json
+          uv run --no-sync zensical build --clean --strict
+          uv run --no-sync coverage html --data-file=coverage-data -d site/coverage
+          uv run --no-sync python -m scripts.coverage_badge coverage.json site/coverage.svg
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment

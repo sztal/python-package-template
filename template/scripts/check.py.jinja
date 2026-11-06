@@ -1,0 +1,37 @@
+"""Run source checks followed by build and distribution validation."""
+
+from __future__ import annotations
+
+import subprocess
+
+
+def tracked_changes() -> tuple[bytes, bytes]:
+    """Return the current unstaged and staged tracked changes."""
+    return (
+        subprocess.check_output(["git", "diff", "--binary"]),
+        subprocess.check_output(["git", "diff", "--cached", "--binary"]),
+    )
+
+
+def main() -> None:
+    """Run checks in order and reject changes made by formatters."""
+    before = tracked_changes()
+    for target in (
+        "lint",
+        "test",
+        "typecheck",
+{%- if docs %}
+        "docs",
+{%- endif %}
+        "build",
+        "check-dist",
+    ):
+        subprocess.run(["make", target], check=True)
+        if tracked_changes() != before:
+            raise RuntimeError(
+                f"{target} modified tracked files; review and rerun checks"
+            )
+
+
+if __name__ == "__main__":
+    main()

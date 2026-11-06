@@ -3,6 +3,9 @@
 [![PyPI](https://img.shields.io/pypi/v/{{ distribution_name }})](https://pypi.org/project/{{ distribution_name }}/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/{{ distribution_name }}?logo=python)](https://pypi.org/project/{{ distribution_name }}/)
 [![CI](https://img.shields.io/github/actions/workflow/status/{{ repository_path }}/ci.yaml?branch=main&logo=github&label=CI)](https://github.com/{{ repository_path }}/actions/workflows/ci.yaml)
+{% if docs -%}
+[![Coverage]({{ documentation_url }}/coverage.svg)]({{ documentation_url }}/coverage/)
+{% endif -%}
 [![License](https://img.shields.io/github/license/{{ repository_path }})](https://github.com/{{ repository_path }}/blob/main/LICENSE)
 [![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -31,15 +34,30 @@ source .venv/bin/activate
 Install the package and its development dependencies:
 
 ```bash
-uv sync --group dev
+uv lock
+uv sync --group dev{% if docs %} --group docs{% endif %}
 ```
 
-Run the test suite and checks with:
+Commit `uv.lock` with the project. Run the test suite and checks with:
 
 ```bash
-uv run pytest
-uv run pre-commit run --all-files
+make test
+make lint
+make typecheck
+make build
+make check-dist
 ```
+{% if tasks == "nox" %}
+Use `make nox` for the supported-Python test matrix and
+`uv run noxfile.py -s tests-3.13 -- tests/` for a focused Nox run.
+{% endif -%}
+{% if docs %}
+Use `make docs` for a strict documentation build and `make docs-serve` for
+the local preview. GitHub Pages deployment requires configuring the repository
+to use GitHub Actions as its Pages source.
+{% endif %}
+See [RELEASING.md](RELEASING.md) for validation, local release preparation,
+and explicit publication.
 {% if cli %}
 ## Execution
 

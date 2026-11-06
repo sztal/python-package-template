@@ -4,7 +4,7 @@
 
 - Distribution: `{{ distribution_name }}`
 - Import package: `{{ package_name }}`
-- Source directory: `src/{{ package_name }}/`
+- Source directory: `{{ package_path }}/`
 - Tests: `tests/`
 - Repository: {{ repository_url }}
 
@@ -21,37 +21,32 @@ changes it, and add or update tests for behavior changes.
 
 ## Development notes
 
-Use `wiki/` to record concise, task-specific context during development.
+Use `wiki/` to record concise, durable development context.
 Read [wiki/example.md](wiki/example.md) before starting a note, and
 replace it with notes that capture decisions, validation results, and useful
 follow-up work.
 
 ## Validation
 
-{% if tasks == "tox" -%}
-Use tox to run the generated automation:
-
-```console
-uvx tox -m checks
-uvx tox -m tests
-```
-{%- elif tasks == "nox" %}
-Use the generated Nox script to run automation:
+{% if tasks == "nox" -%}
+Use direct pytest for a focused run and the generated Nox script for checks:
 
 ```console
 uv run noxfile.py -s lint
 uv run noxfile.py -s typecheck
-uv run noxfile.py -s tests
+uv run pytest
 ```
-{%- else %}
+
+Use `uv run noxfile.py -s tests` for the full supported-Python matrix.
+{%- else -%}
 Run the appropriate dependency group directly:
 
 ```console
 uv run --group lint pre-commit run --all-files
-uv run --group type mypy src tests
+uv run --group type mypy {{ package_path }} tests scripts
 uv run --group test pytest
 ```
-{%- endif %}
+{%- endif -%}
 {%- if docs %}
 
 ## Documentation

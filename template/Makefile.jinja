@@ -1,0 +1,121 @@
+.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release-notes release publish
+{% if tasks == "nox" %}
+.PHONY: nox
+{% endif %}
+{% if docs %}
+.PHONY: docs docs-serve
+{% endif %}
+
+export VERSION TAG
+
+help:
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "Targets:"
+	@echo "  help           Show this help message"
+	@echo "  clean          Remove build artifacts and cache files"
+	@echo "  build          Build source distribution and wheel"
+	@echo "  wheel          Build wheel only"
+	@echo "  install        Install the package with development dependencies"
+	@echo "  test           Run the pytest suite"
+{% if tasks == "nox" %}
+	@echo "  nox            Run the supported-Python test matrix"
+{% endif %}
+	@echo "  coverage       Run tests with a terminal coverage report"
+	@echo "  coverage-html  Run tests with an HTML coverage report"
+	@echo "  lint           Run pre-commit checks"
+	@echo "  format         Format Python files with Ruff"
+	@echo "  typecheck      Run mypy"
+{% if docs %}
+	@echo "  docs           Build documentation strictly"
+	@echo "  docs-serve     Preview documentation"
+{% endif %}
+	@echo "  check          Run source and distribution checks"
+	@echo "  check-dist     Validate distributions; optionally set TAG=vX.Y.Z"
+	@echo "  release-notes  Preview notes for VERSION=X.Y.Z"
+	@echo "  release        Prepare VERSION locally without publishing"
+	@echo "  publish        Explicitly publish an existing remote TAG"
+
+init:
+	make install
+	uv run pre-commit install
+
+clean:
+	rm -rf dist/ build/ .nox/ .pytest_cache/ .ruff_cache/ htmlcov/
+	find . -name "*.egg-info" -type d -prune -exec rm -rf {} +
+	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
+	find . -name "*.py[cod]" -delete
+	find . -name ".coverage*" -delete
+
+build:
+	uv build --no-sources
+
+wheel:
+	uv build --no-sources --wheel
+
+install:
+	uv sync --group dev
+
+test:
+	uv run pytest
+
+{% if tasks == "nox" %}
+nox:
+	uv run noxfile.py -s tests
+
+{% endif %}
+
+coverage:
+	uv run coverage run -m pytest
+	uv run coverage report
+
+coverage-html:
+	uv run coverage run -m pytest
+	uv run coverage html
+
+lint:
+{% if tasks == "nox" %}
+	uv run noxfile.py -s lint
+{% else %}
+	uv run pre-commit run --all-files
+{% endif %}
+
+format:
+	uv run ruff format .
+
+typecheck:
+{% if tasks == "nox" %}
+	uv run noxfile.py -s typecheck
+{% else %}
+	uv run mypy {{ package_path }} tests scripts
+{% endif %}
+
+{% if docs %}
+docs:
+{% if tasks == "nox" %}
+	uv run noxfile.py -s docs
+{% else %}
+	uv run --group docs zensical build --clean --strict
+{% endif %}
+
+docs-serve:
+{% if tasks == "nox" %}
+	uv run noxfile.py -s autodocs
+{% else %}
+	uv run --group docs zensical serve --open
+{% endif %}
+{% endif %}
+check:
+	uv run --group release python -m scripts.check
+
+check-dist:
+	uv run --group release python -m scripts.distributions check
+
+release-notes:
+	uv run --group release python -m scripts.release --notes
+
+release:
+	uv run --group release python -m scripts.release
+
+publish:
+	uv run --group release python -m scripts.publish

@@ -40,13 +40,17 @@ repos:
 {%- if docs %}
         exclude: ^docs/
 {%- endif %}
+        args: [--number]
         additional_dependencies:
           - mdformat-gfm
+          - mdformat-front-matters
 {%- if docs == 'zensical' %}
       - id: mdformat
         files: ^docs/
+        args: [--number, --ignore-missing-references]
         additional_dependencies:
           - mdformat-footnote
           - mdformat-front-matters
+          - mdformat-mkdocs==5.3.0
           - mdformat-simple-breaks
 {%- endif %}

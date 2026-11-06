@@ -11,6 +11,7 @@ nav = [
   { "Home" = [
     "index.md",
     { "Release notes" = "changelog.md" },
+    { "Building and releasing" = "releasing.md" },
     { "License" = "license.md" },
   ] },
   { "Reference" = [
@@ -64,12 +65,30 @@ icon = "fontawesome/brands/github"
 link = "{{ repository_url }}"
 
 [project.markdown_extensions]
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+toc = { permalink = true }
+pymdownx.details = {}
 pymdownx.highlight = { anchor_linenums = true, pygments_lang_class = true }
+pymdownx.inlinehilite = {}
 pymdownx.snippets = {}
-pymdownx.superfences = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
 pymdownx.tabbed = { alternate_style = true }
 
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+
+[project.plugins.mkdocstrings]
+enable_inventory = true
+
 [project.plugins.mkdocstrings.handlers.python]
+paths = ["{{ package_root }}"]
 inventories = [
   "https://docs.python.org/3/objects.inv",
 ]
@@ -83,7 +102,7 @@ type_parameter_headings = true
 inherited_members = true
 members_order = "source"
 summary = true
-docstring_style = "google"
+docstring_style = "numpy"
 docstring_options = { ignore_init_summary = true }
 docstring_section_style = "table"
 merge_init_into_class = true

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import nox
 
@@ -46,6 +47,10 @@ def tests(session: nox.Session) -> None:
         session=session,
     )
 {%- endif %}
+    if session.posargs:
+        session.run("pytest", *session.posargs)
+        return
+
     tmp_dir = Path(session.create_tmp())
 
     if os.getenv("COVERAGE_FILE") is None:
@@ -57,15 +62,10 @@ def tests(session: nox.Session) -> None:
         "run",
         "-m",
         "pytest",
-        *(
-            session.posargs
-            or (
-                "--durations",
-                "15",
-                "-n",
-                os.getenv("PYTEST_XDIST_AUTO_NUM_WORKERS") or "auto",
-            )
-        ),
+        "--durations",
+        "15",
+        "-n",
+        os.getenv("PYTEST_XDIST_AUTO_NUM_WORKERS") or "auto",
     )
     session.run("coverage", "combine")
     session.run("coverage", "report")
@@ -103,7 +103,10 @@ def typecheck(session: nox.Session) -> None:
         session=session,
     )
 {%- endif %}
-    session.run("mypy", *(session.posargs or ("{{ package_root }}", "tests")))
+    session.run(
+        "mypy",
+        *(session.posargs or ("{{ package_path }}", "tests", "scripts", "noxfile.py")),
+    )
 
 {% if docs %}
 @nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"])
@@ -121,6 +124,7 @@ def docs(session: nox.Session) -> None:
         "--strict",
         *session.posargs,
     )
+
 
 @nox.session(python=DEFAULT_PYTHON_VERSION)
 def autodocs(session: nox.Session) -> None:

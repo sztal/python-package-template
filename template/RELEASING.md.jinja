@@ -1,0 +1,90 @@
+# Building and releasing
+
+This project uses `main` for integration and annotated Git tags for versions.
+Hatchling and `uv-dynamic-versioning` derive the package version from Git;
+do not manually edit a version field or use a version override for releases.
+Run `uv lock` and commit `uv.lock` before using the release workflow.
+
+## Development and validation
+
+Add Towncrier fragments under `changelog.d/` for user-visible changes using
+the categories configured in `pyproject.toml`.
+
+```console
+make test
+make lint
+make typecheck
+make build
+make check-dist
+make check
+```
+
+`make test` runs pytest on the active Python. `make check` runs lint before
+tests, type checking{% if docs %}, a strict documentation build{% endif %},
+builds the sdist and wheel, and validates both. `make check-dist` requires
+exactly one matching wheel and sdist in `dist/`; it checks their metadata and
+contents with Twine, rebuilds the wheel from the sdist, and installs both
+wheels in isolated environments, importing the package and loading its console
+entry points. Old files in `dist/` must be removed
+explicitly before checking another version. `TAG=v1.2.3` additionally requires
+a clean checkout, an annotated tag at the current commit, and an exact version
+match.
+{% if tasks == "nox" %}
+`make nox` runs the supported-Python Nox matrix. For a focused run, pass a
+test path after `--`, for example
+`uv run noxfile.py -s tests-3.13 -- tests/test_version.py`.
+{% endif -%}
+{% if docs %}
+## Documentation
+
+Use `make docs` for a clean, strict Zensical build and `make docs-serve` for a
+local preview. CI validates documentation on pull requests and publishes the
+validated `main` commit to GitHub Pages after checks succeed. A successful
+final PyPI release also deploys the tagged documentation. TestPyPI releases
+do not deploy it. Coverage data from the same validation run produces
+`coverage/` and `coverage.svg` on the site.
+
+In repository settings, choose GitHub Actions as the Pages source and allow
+the `github-pages` environment to deploy from `main`.
+{% endif %}
+## Prepare a release
+
+Use canonical `X.Y.Z` versions, optionally followed by `aN`, `bN`, or `rcN`.
+Start on clean `main` containing `origin/main`, with a committed lockfile.
+Versions must advance existing local and remote tags.
+
+```console
+make release-notes VERSION=1.2.0
+uv run --group release python -m scripts.release --dry-run 1.2.0
+make release VERSION=1.2.0
+```
+
+Preparation runs in an isolated clone and validates the tagged artifacts.
+The dry run leaves the caller's files and refs unchanged. A final release
+consumes pending fragments into the changelog; a prerelease keeps them.
+Successful preparation advances local `main` and creates an annotated tag,
+but does not push, publish, or create a GitHub release. The command prints
+the explicit atomic push command. Pushing the tag only validates it.
+
+## Publish explicitly
+
+After pushing the prepared commit and tag, run:
+
+```console
+make publish TAG=v1.2.0
+```
+
+The command requires the GitHub CLI, dispatches the release workflow, and
+watches that specific run. Prereleases go to TestPyPI; final releases go to
+PyPI. CI builds and checks fresh artifacts from the tagged commit and uploads
+those exact files. It creates a GitHub release only after publication succeeds.
+
+Configure Trusted Publishing on PyPI and TestPyPI for repository
+`{{ repository_path }}`, workflow `release.yaml`, and the corresponding
+`pypi` and `testpypi` GitHub environments. Configure each index separately;
+the workflow uses OIDC and does not require long-lived API tokens.
+
+If preparation fails, inspect the retained checkout path printed by the tool.
+If a dispatch times out or publication partially succeeds, inspect the named
+Actions run and package index before retrying. Do not move or recreate tags or
+blindly upload a different artifact under an existing version.

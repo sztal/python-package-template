@@ -1,56 +1,67 @@
 ---
-name: CD
+name: Release
+run-name: {% raw %}${{ github.event_name == 'workflow_dispatch' && format('Publish {0} [{1}]', inputs.tag, inputs.request_id) || format('Validate {0}', github.ref_name) }}{% endraw %}
 
 on:
   push:
-    branches: [main]
-    tags: ['*']
-  workflow_dispatch: null
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Annotated release tag on main history
+        required: true
+        type: string
+      request_id:
+        description: Unique request identifier
+        required: true
+        type: string
+
+concurrency:
+  group: {% raw %}release-${{ inputs.tag || github.ref_name }}{% endraw %}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build Python package distributions
+  resolve:
     runs-on: ubuntu-latest
+    outputs:
+      commit: {% raw %}${{ steps.tag.outputs.commit }}{% endraw %}
+      tag: {% raw %}${{ steps.tag.outputs.tag }}{% endraw %}
+      index: {% raw %}${{ steps.tag.outputs.index }}{% endraw %}
+      prerelease: {% raw %}${{ steps.tag.outputs.prerelease }}{% endraw %}
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: main
           fetch-depth: 0
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          github-token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
-      - name: Build Python package distributions
-        run: uv build
-      - name: Store Python package distributions
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist
+      - uses: astral-sh/setup-uv@v7
+      - name: Validate the release tag
+        id: tag
+        env:
+          EVENT: {% raw %}${{ github.event_name }}{% endraw %}
+          REF: {% raw %}${{ github.ref }}{% endraw %}
+          INPUT_TAG: {% raw %}${{ inputs.tag }}{% endraw %}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            test "$REF" = refs/heads/main
+            export TAG="$INPUT_TAG"
+          else
+            export TAG="${REF#refs/tags/}"
+          fi
+          uv run --locked --group release python -m scripts.publish --resolve
 
-  release-pypi:
-    name: Publish to PyPI
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/{{ distribution_name }}
-    permissions:
-      id-token: write
-    steps:
-      - name: Download Python package distributions
-        uses: actions/download-artifact@v5
-        with:
-          name: python-package-distributions
-          path: dist
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  validation:
+    needs: resolve
+    uses: ./.github/workflows/checks.yaml
+    with:
+      ref: {% raw %}${{ needs.resolve.outputs.commit }}{% endraw %}
+      tag: {% raw %}${{ needs.resolve.outputs.tag }}{% endraw %}
 
-  release-testpypi:
-    name: Publish to TestPyPI
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
+  publish-testpypi:
+    if: {% raw %}${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.resolve.outputs.index == 'testpypi' }}{% endraw %}
+    needs: [resolve, validation]
     runs-on: ubuntu-latest
     environment:
       name: testpypi
@@ -58,12 +69,60 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Download Python package distributions
-        uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v5
         with:
           name: python-package-distributions
           path: dist
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    if: {% raw %}${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.resolve.outputs.index == 'pypi' }}{% endraw %}
+    needs: [resolve, validation]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/{{ distribution_name }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: python-package-distributions
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+{% if docs %}
+  pages:
+    if: {% raw %}${{ github.event_name == 'workflow_dispatch' && needs.publish-pypi.result == 'success' }}{% endraw %}
+    needs: [resolve, validation, publish-pypi]
+    uses: ./.github/workflows/pages.yaml
+    with:
+      ref: {% raw %}${{ needs.resolve.outputs.commit }}{% endraw %}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+{% endif %}
+  github-release:
+    if: {% raw %}${{ always() && github.event_name == 'workflow_dispatch' && needs.validation.result == 'success' && (needs.publish-pypi.result == 'success' || needs.publish-testpypi.result == 'success') }}{% endraw %}
+    needs: [resolve, validation, publish-pypi, publish-testpypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: {% raw %}${{ needs.resolve.outputs.commit }}{% endraw %}
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - name: Create the GitHub release
+        env:
+          TAG: {% raw %}${{ needs.resolve.outputs.tag }}{% endraw %}
+          PRERELEASE: {% raw %}${{ needs.resolve.outputs.prerelease }}{% endraw %}
+          GH_TOKEN: {% raw %}${{ github.token }}{% endraw %}
+        run: |
+          uv run --locked --group release python -m scripts.publish --notes-file "$RUNNER_TEMP/release-notes.md"
+          args=()
+          if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
+          gh release create "$TAG" --verify-tag --notes-file "$RUNNER_TEMP/release-notes.md" "${args[@]}"

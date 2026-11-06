@@ -1,0 +1,33 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request: null
+  workflow_dispatch: null
+
+concurrency:
+  group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yaml
+    with:
+      ref: {% raw %}${{ github.sha }}{% endraw %}
+{% if docs %}
+  pages:
+    if: {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}{% endraw %}
+    needs: checks
+    uses: ./.github/workflows/pages.yaml
+    with:
+      ref: {% raw %}${{ github.sha }}{% endraw %}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+{% endif -%}

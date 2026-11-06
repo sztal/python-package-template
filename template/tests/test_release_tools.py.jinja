@@ -1,0 +1,156 @@
+"""Tests for reusable package release tooling."""
+
+from __future__ import annotations
+
+import io
+import subprocess
+import tarfile
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from scripts import distributions, publish, release
+
+
+@pytest.fixture
+def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Create an independent repository and a local bare remote."""
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-config"))
+    project = tmp_path / "project"
+    project.mkdir()
+    release.git(project, "init", "-q", "--initial-branch=main")
+    release.git(project, "config", "user.name", "Release Test")
+    release.git(project, "config", "user.email", "release@example.invalid")
+    (project / "uv.lock").write_text("lock\n")
+    (project / "CHANGELOG.md").write_text("# Changelog\n")
+    (project / "changelog.d").mkdir()
+    (project / "changelog.d/+test.added.md").write_text("A change.\n")
+    release.git(project, "add", ".")
+    release.git(project, "commit", "-qm", "Initial commit")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "clone", "--bare", str(project), str(remote)], check=True)
+    release.git(project, "remote", "add", "origin", str(remote))
+    return project
+
+
+@pytest.mark.parametrize("tag", ["v1.2.3", "v1.2.3a1", "v1.2.3b0", "v1.2.3rc4"])
+def test_release_version_accepts_canonical_tags(tag: str) -> None:
+    assert str(distributions.release_version(tag)) == tag[1:]
+
+
+@pytest.mark.parametrize(
+    "tag", ["1.2.3", "v01.2.3", "v1.2", "v1.2.3.dev1", "v1.2.3+local", "v1.2.3rc01"]
+)
+def test_release_version_rejects_noncanonical_tags(tag: str) -> None:
+    with pytest.raises(ValueError):
+        distributions.release_version(tag)
+
+
+@pytest.mark.parametrize("kind", ["untracked", "unstaged", "staged"])
+def test_release_requires_completely_clean_worktree(
+    repository: Path, kind: str
+) -> None:
+    if kind == "untracked":
+        (repository / "untracked").write_text("change")
+    else:
+        (repository / "CHANGELOG.md").write_text("change")
+        if kind == "staged":
+            release.git(repository, "add", "CHANGELOG.md")
+    with pytest.raises(RuntimeError, match="clean"):
+        release.state(repository)
+
+
+def test_release_rejects_existing_or_older_version(repository: Path) -> None:
+    release.git(repository, "tag", "-a", "v1.2.3", "-m", "release")
+    with pytest.raises(ValueError, match="already exists"):
+        release.check_available(repository, "v1.2.3")
+    with pytest.raises(ValueError, match="newer"):
+        release.check_available(repository, "v1.2.2")
+    release.check_available(repository, "v1.2.4")
+
+
+def test_distribution_tag_must_be_annotated_and_clean(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(repository)
+    release.git(repository, "tag", "v1.0.0")
+    with pytest.raises(ValueError, match="annotated"):
+        distributions.verify_tag("v1.0.0")
+    release.git(repository, "tag", "-d", "v1.0.0")
+    release.git(repository, "tag", "-a", "v1.0.0", "-m", "release")
+    assert str(distributions.verify_tag("v1.0.0")) == "1.0.0"
+    (repository / "untracked").write_text("change")
+    with pytest.raises(ValueError, match="clean"):
+        distributions.verify_tag("v1.0.0")
+
+
+def test_release_rehearsal_preserves_caller(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    head = release.git(repository, "rev-parse", "HEAD")
+    checked: list[str] = []
+
+    def validate(directory: Path, tag: str) -> None:
+        assert release.git(directory, "cat-file", "-t", f"refs/tags/{tag}") == "tag"
+        checked.append(tag)
+
+    monkeypatch.setattr(release, "notes", lambda *_args: None)
+    monkeypatch.setattr(release, "validate", validate)
+    release.prepare(repository, "1.0.0rc1", dry_run=True)
+    assert checked == ["v1.0.0rc1"]
+    assert release.git(repository, "rev-parse", "HEAD") == head
+    assert not release.git(repository, "tag", "--list")
+    assert not release.git(repository, "status", "--porcelain")
+
+
+@pytest.mark.parametrize(
+    ("tag", "expected_prerelease"), [("v1.0.0", False), ("v1.0.0rc1", True)]
+)
+def test_publish_resolves_only_remote_annotated_tags(
+    repository: Path, tag: str, expected_prerelease: bool
+) -> None:
+    release.git(repository, "tag", tag)
+    with pytest.raises(ValueError, match="annotated"):
+        publish.resolve(repository, tag)
+    release.git(repository, "tag", "-d", tag)
+    release.git(repository, "tag", "-a", tag, "-m", "release")
+    release.git(repository, "push", "origin", f"refs/tags/{tag}")
+    commit, prerelease = publish.resolve(repository, tag)
+    assert commit == release.git(repository, "rev-parse", "HEAD")
+    assert prerelease is expected_prerelease
+
+
+def test_distribution_inspection_checks_metadata_and_stale_files(
+    tmp_path: Path,
+) -> None:
+    name = distributions.NAME.replace("-", "_")
+    root = f"{name}-1.0.0"
+    content = (
+        f"Metadata-Version: 2.4\nName: {distributions.NAME}\nVersion: 1.0.0\n"
+        "Requires-Python: >=3.10\nLicense-Expression: MIT\n\n"
+    ).encode()
+    wheel = tmp_path / f"{root}-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr(f"{root}.dist-info/METADATA", content)
+        archive.writestr(f"{root}.dist-info/licenses/LICENSE", "license")
+        archive.writestr(f"{distributions.IMPORT_NAME}/__init__.py", "")
+        archive.writestr(f"{distributions.IMPORT_NAME}/py.typed", "")
+    sdist = tmp_path / f"{root}.tar.gz"
+    with tarfile.open(sdist, "w:gz") as archive:
+        for path, data in {
+            "PKG-INFO": content,
+            "pyproject.toml": b"",
+            "README.md": b"",
+            "LICENSE": b"",
+            f"{distributions.SOURCE_PATH}/__init__.py": b"",
+            f"{distributions.SOURCE_PATH}/py.typed": b"",
+        }.items():
+            member = tarfile.TarInfo(f"{root}/{path}")
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+    assert distributions.inspect(tmp_path) == (wheel, sdist)
+    (tmp_path / "stale.whl").touch()
+    with pytest.raises(ValueError, match="exactly one"):
+        distributions.inspect(tmp_path)

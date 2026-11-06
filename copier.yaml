@@ -202,7 +202,7 @@ features:
 tasks:
   type: str
   help: Which task automation tool do you want to use?
-  default: nox
+  default: "{{ 'nox' if 'tasks' in features else '' }}"
   when: false
 
 install:

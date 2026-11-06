@@ -180,14 +180,16 @@ directory:
 - `noxfile.py`: test, lint, type-check, and documentation sessions using uv;
 - `.pre-commit-config.yaml`: Ruff checking and formatting plus repository
   hygiene hooks;
-- `Makefile`: short commands for installation, testing, linting, formatting,
-  coverage, and builds;
+- `Makefile`: commands for installation, testing, linting, type checking,
+  coverage, distribution validation, documentation, and release preparation;
 - `docs/` and `zensical.toml`: optional Zensical documentation support;
-- `.github/workflows/`: CI and release workflows;
+- `.github/workflows/`: shared CI checks, optional Pages deployment, and
+  explicitly dispatched package publication;
 - `AGENTS.md` and `.github/skills/`: generated repository context and
   on-demand workflows for development, audits, wiki notes, package builds,
   branch integration, and releases, including a first-run inspection checklist;
-- `scripts/release.py`: Towncrier and Git-tag release automation;
+- `scripts/` and `RELEASING.md`: distribution checks, local Git-tag release
+  preparation, and explicit Trusted Publishing guidance;
 - `LICENSE`, `CHANGELOG.md`, and optional `CODE_OF_CONDUCT.md`.
 
 The generated build uses Git tags as its version source. A release tag such as
@@ -205,14 +207,15 @@ uv run copier copy --trust --defaults \
 ```
 
 At minimum, check the default flat layout, a `src` layout, a namespace layout,
-both documentation backends, and the optional Code of Conduct. For generated
-projects, initialize Git, create a version tag, and run:
+documentation and task automation both enabled and disabled, and the optional
+Code of Conduct. For generated projects, initialize Git, create a version tag,
+and run:
 
 ```bash
 uv build
 uv run pytest
-nox -s lint
-nox -s typecheck
+make lint
+make typecheck
 ```
 
 When changing a template filename or answer, inspect the generated tree and

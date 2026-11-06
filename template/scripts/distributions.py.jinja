@@ -1,0 +1,207 @@
+"""Validate built source and wheel distributions."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import tarfile
+import zipfile
+from email.message import Message
+from email.parser import BytesParser
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from packaging.utils import (
+    canonicalize_name,
+    parse_sdist_filename,
+    parse_wheel_filename,
+)
+from packaging.version import Version
+
+NAME = "{{ distribution_name }}"
+IMPORT_NAME = "{{ package_name }}"
+SOURCE_PATH = "{{ package_path }}".removeprefix("./")
+TAG_PATTERN = re.compile(
+    r"v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:(?:a|b|rc)(?:0|[1-9]\d*))?"
+)
+
+
+def release_version(tag: str) -> Version:
+    """Return a canonical release version."""
+    if not TAG_PATTERN.fullmatch(tag):
+        raise ValueError("Expected vX.Y.Z, optionally followed by aN, bN, or rcN")
+    return Version(tag[1:])
+
+
+def verify_tag(tag: str) -> Version:
+    """Require an annotated release tag pointing at the current commit."""
+    version = release_version(tag)
+    if subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all"], text=True
+    ).strip():
+        raise ValueError("Release distribution checks require a clean working tree")
+    ref = f"refs/tags/{tag}"
+    kind = subprocess.check_output(["git", "cat-file", "-t", ref], text=True).strip()
+    if kind != "tag":
+        raise ValueError("Release tag must be annotated")
+    header = subprocess.check_output(["git", "cat-file", "-p", ref], text=True)
+    if "type commit" not in header.partition("\n\n")[0].splitlines():
+        raise ValueError("Release tag must point directly to a commit")
+    commit = subprocess.check_output(
+        ["git", "rev-parse", ref + "^{commit}"], text=True
+    ).strip()
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    if commit != head:
+        raise ValueError("Release tag must point to the current commit")
+    return version
+
+
+def metadata(path: Path) -> Message:
+    """Read metadata and check the essential files of an archive."""
+    if path.suffix == ".whl":
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            entries = [name for name in names if name.endswith(".dist-info/METADATA")]
+            required = {f"{IMPORT_NAME}/__init__.py", f"{IMPORT_NAME}/py.typed"}
+            if len(entries) != 1 or not required.issubset(names):
+                raise ValueError(f"{path.name} is missing package files or metadata")
+            if not any(".dist-info/licenses/" in name for name in names):
+                raise ValueError(f"{path.name} is missing its license")
+            return BytesParser().parsebytes(archive.read(entries[0]))
+    with tarfile.open(path) as archive:
+        names = archive.getnames()
+        root = path.name.removesuffix(".tar.gz")
+        required = {
+            f"{root}/{name}"
+            for name in (
+                "PKG-INFO",
+                "pyproject.toml",
+                "README.md",
+                "LICENSE",
+                f"{SOURCE_PATH}/__init__.py",
+                f"{SOURCE_PATH}/py.typed",
+            )
+        }
+        if not required.issubset(names):
+            raise ValueError(f"{path.name} is missing required source files")
+        stream = archive.extractfile(f"{root}/PKG-INFO")
+        if stream is None:
+            raise ValueError("Source distribution metadata is not a regular file")
+        return BytesParser().parsebytes(stream.read())
+
+
+def inspect(directory: Path, tag: str | None = None) -> tuple[Path, Path]:
+    """Require a matching wheel and sdist and compare their metadata."""
+    entries = {path for path in directory.iterdir() if path.name != ".gitignore"}
+    wheels = list(directory.glob("*.whl"))
+    sdists = list(directory.glob("*.tar.gz"))
+    if len(wheels) != 1 or len(sdists) != 1 or entries != {*wheels, *sdists}:
+        raise ValueError("Expected exactly one wheel and one sdist in dist/")
+    wheel, sdist = wheels[0], sdists[0]
+    wheel_name, wheel_version, _, _ = parse_wheel_filename(wheel.name)
+    source_name, source_version = parse_sdist_filename(sdist.name)
+    if (
+        wheel_name != canonicalize_name(NAME)
+        or source_name != wheel_name
+        or source_version != wheel_version
+    ):
+        raise ValueError("Distribution filenames have mismatched names or versions")
+    if tag and verify_tag(tag) != wheel_version:
+        raise ValueError("Distribution version does not match the release tag")
+    wheel_info, source_info = metadata(wheel), metadata(sdist)
+    for info in (wheel_info, source_info):
+        if canonicalize_name(info["Name"]) != wheel_name or info["Version"] != str(
+            wheel_version
+        ):
+            raise ValueError("Distribution metadata does not match its filename")
+        if not info["Requires-Python"]:
+            raise ValueError("Distribution metadata is missing Requires-Python")
+    for field in ("Requires-Python", "License-Expression", "Requires-Dist"):
+        if sorted(wheel_info.get_all(field, [])) != sorted(
+            source_info.get_all(field, [])
+        ):
+            raise ValueError(f"Wheel and sdist differ in {field}")
+    return wheel, sdist
+
+
+def check(directory: Path, tag: str | None = None) -> None:
+    """Check artifacts, rebuild the sdist, and install the wheels in isolation."""
+    if os.environ.get("UV_DYNAMIC_VERSIONING_BYPASS"):
+        raise ValueError("Do not override the version when checking distributions")
+    wheel, sdist = inspect(directory, tag)
+    subprocess.run(["twine", "check", "--strict", str(wheel), str(sdist)], check=True)
+    with TemporaryDirectory(prefix="package-dist-check-") as temporary:
+        root = Path(temporary)
+        output = root / "rebuilt"
+        subprocess.run(
+            [
+                "uv",
+                "build",
+                "--no-sources",
+                "--wheel",
+                "--out-dir",
+                str(output),
+                str(sdist.resolve()),
+            ],
+            cwd=root,
+            check=True,
+        )
+        rebuilt_wheels = list(output.glob("*.whl"))
+        if len(rebuilt_wheels) != 1:
+            raise ValueError("Rebuilding the sdist did not produce exactly one wheel")
+        rebuilt = rebuilt_wheels[0]
+        original_info = metadata(wheel)
+        rebuilt_info = metadata(rebuilt)
+        for field in (
+            "Name",
+            "Version",
+            "Requires-Python",
+            "License-Expression",
+            "Requires-Dist",
+        ):
+            if sorted(original_info.get_all(field, [])) != sorted(
+                rebuilt_info.get_all(field, [])
+            ):
+                raise ValueError(f"Rebuilt wheel differs in {field}")
+        for index, artifact in enumerate((wheel.resolve(), rebuilt)):
+            environment = root / f"venv-{index}"
+            subprocess.run(["uv", "venv", str(environment)], check=True)
+            python = environment / (
+                "Scripts/python.exe" if os.name == "nt" else "bin/python"
+            )
+            subprocess.run(
+                ["uv", "pip", "install", "--python", str(python), str(artifact)],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    str(python),
+                    "-c",
+                    (
+                        "import importlib, importlib.metadata, sys; "
+                        "importlib.import_module(sys.argv[1]); "
+                        "[entry.load() for entry in "
+                        "importlib.metadata.distribution(sys.argv[2]).entry_points "
+                        "if entry.group == 'console_scripts']"
+                    ),
+                    IMPORT_NAME,
+                    NAME,
+                ],
+                cwd=root,
+                check=True,
+            )
+
+
+def main() -> None:
+    """Check the distributions in dist/ and optionally require a release tag."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("check",))
+    parser.add_argument("--tag", default=os.environ.get("TAG") or None)
+    args = parser.parse_args()
+    check(Path("dist"), args.tag)
+
+
+if __name__ == "__main__":
+    main()

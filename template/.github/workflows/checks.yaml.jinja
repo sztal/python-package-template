@@ -1,0 +1,99 @@
+---
+name: Shared validation
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      tag:
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: {% raw %}${{ inputs.ref }}{% endraw %}
+      - uses: astral-sh/setup-uv@v7
+      - run: make lint
+      - run: git diff --exit-code
+
+  checks:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: {% raw %}${{ inputs.ref }}{% endraw %}
+      - uses: astral-sh/setup-uv@v7
+      - run: make typecheck
+{% if docs %}
+      - run: make docs
+{% endif %}
+      - run: git diff --exit-code
+
+  distributions:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: {% raw %}${{ inputs.ref }}{% endraw %}
+      - uses: astral-sh/setup-uv@v7
+      - run: make build check-dist
+        env:
+          TAG: {% raw %}${{ inputs.tag }}{% endraw %}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: {% raw %}${{ inputs.ref }}{% endraw %}
+      - uses: astral-sh/setup-uv@v7
+{% if tasks == "nox" %}
+      - run: uv run noxfile.py -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
+        env:
+          COVERAGE_FILE: coverage-data
+          PYTEST_XDIST_AUTO_NUM_WORKERS: '2'
+{% else %}
+      - run: |
+          uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage erase
+          uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage run -m pytest -n 2
+          uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage combine
+          uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage report
+        env:
+          COVERAGE_FILE: coverage-data
+{% endif -%}
+{% if docs %}
+      - name: Store coverage data for documentation
+        if: {% raw %}${{ matrix.python_version == '3.13' }}{% endraw %}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data
+          path: coverage-data
+          if-no-files-found: error
+{% endif -%}
