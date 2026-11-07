@@ -177,8 +177,8 @@ pretty = true
 [tool.pytest]
 addopts = [
   "-ra",
-  "-v",
   "--tb=short",
+  "-n=auto",
 {%- if pytest_testmon == 'automatic' %}
   "--testmon",
 {%- endif %}
