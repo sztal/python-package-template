@@ -252,6 +252,12 @@ def test_generated_branch_and_changelog(
     )
     assert "INTEGRATION_BRANCH" in (project / "scripts/publish.py").read_text()
     merge_skill = (project / ".github/skills/merge-branch/SKILL.md").read_text()
+    guide = (project / "AGENTS.md").read_text()
+    assert f"branch into `{branch}`" in guide
+    assert f"merging into `{branch}`" in merge_skill
+    for guidance in (guide, merge_skill):
+        assert "git merge --squash" in guidance
+        assert "their rationale, and validation" in guidance
     if has_changelog:
         assert f"merge into `{branch}`" in merge_skill
         assert "commit messages and Git history" in merge_skill

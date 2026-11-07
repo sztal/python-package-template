@@ -19,6 +19,10 @@ pytest, and coverage configuration.
 Keep changes focused, preserve public behavior unless the task intentionally
 changes it, and add or update tests for behavior changes.
 
+When merging a development branch into `{{ integration_branch }}`, use
+`git merge --squash` and create one commit with a descriptive subject and a
+detailed body covering the changes, their rationale, and validation.
+
 {% if changelog -%}
 Changelog fragments are added only when merging into `{{ integration_branch }}`.
 Review the incoming branch's commit messages and Git history not yet in
