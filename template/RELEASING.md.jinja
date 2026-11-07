@@ -37,7 +37,7 @@ match.
 {% if tasks == "nox" %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example
-`uv run noxfile.py -s tests-3.13 -- tests/test_version.py`.
+`uv run noxfile.py -s tests-{{ minimum_python }} -- tests/test_version.py`.
 {% endif -%}
 {% if docs %}
 ## Documentation

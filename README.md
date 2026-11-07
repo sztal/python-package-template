@@ -72,7 +72,12 @@ values. Important choices include:
 - `changelog`: enable changelog and Towncrier support (default: enabled);
   fragments are written at integration-branch merge time from the incoming
   branch's Git history and assembled for releases
-- `target_python`: the Ruff and mypy target, from `py313` through `py315`; the default is `py314`
+- `minimum_python`: the minimum supported version, from `3.13` through `3.15`
+  (default: `3.13`); CI tests through Python 3.15
+- `target_python`: the default interpreter and Ruff and mypy target, from `py313`
+  through `py315` (default: `py315`); it must be at least the minimum version.
+  When targeting a newer version, ensure tool suggestions and code remain
+  compatible with the minimum supported version.
 - `pytest_testmon`: `no` (default), `manual` to enable `pytest --testmon`,
   or `automatic` to use testmon by default; coverage targets always disable it
   when installed so they run the full suite
@@ -95,7 +100,8 @@ To provide answers non-interactively, pass Copier data explicitly:
 copier copy --trust \
   --data project_name=example \
   --data project_description='An example package' \
-  --data target_python=py314 \
+  --data minimum_python=3.13 \
+  --data target_python=py315 \
   gh:sztal/python-package-template ./example
 ```
 
@@ -124,7 +130,8 @@ generated distribution before releasing it. When overriding both the layout
 and namespace name during that update, also set `package_type=namespace`.
 
 Projects using a `target_python` below `py313` must select a supported target
-when updating; generated projects now require Python 3.13 or newer.
+when updating. Existing saved targets are retained; the new `minimum_python`
+answer defaults to `3.13`. Review `.python-version` and tooling changes on update.
 
 ## Template Mechanics
 

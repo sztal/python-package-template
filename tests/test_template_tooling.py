@@ -31,7 +31,9 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture(
     params=[
         {},
-        {"package_layout": "src", "features": [], "target_python": "py315"},
+        {"package_layout": "src", "features": [], "target_python": "py313"},
+        {"minimum_python": "3.14", "target_python": "py314"},
+        {"minimum_python": "3.15", "target_python": "py315", "features": []},
         {"package_type": "namespace", "namespace_name": "example_namespace"},
         {"package_layout": "src", "package_type": "namespace", "features": []},
         {
@@ -57,6 +59,8 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
     ids=(
         "flat-standard-default",
         "src-standard-no-options",
+        "minimum-and-target-314",
+        "minimum-and-target-315",
         "flat-namespace",
         "src-namespace-default-name",
         "src-namespace-cli-doctests",
@@ -120,23 +124,6 @@ def test_rendered_tooling_is_complete(
     )
     with (project / "pyproject.toml").open("rb") as stream:
         config = tomllib.load(stream)
-    target_python = data.get("target_python", "py314")
-    assert isinstance(target_python, str)
-    assert config["tool"]["ruff"]["target-version"] == target_python
-    assert config["tool"]["mypy"]["python_version"] == f"3.{target_python[3:]}"
-    assert config["project"]["requires-python"] == ">=3.13"
-    assert "Programming Language :: Python :: 3.15" in config["project"]["classifiers"]
-    assert (
-        "Programming Language :: Python :: 3.12" not in config["project"]["classifiers"]
-    )
-    checks_workflow = yaml.safe_load(
-        (project / ".github/workflows/checks.yaml").read_text()
-    )
-    assert checks_workflow["jobs"]["tests"]["strategy"]["matrix"]["python_version"] == [
-        "3.13",
-        "3.14",
-        "3.15",
-    ]
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
     testmon = data.get("pytest_testmon", "no")
     assert ("pytest-testmon>=2.3.0" in config["dependency-groups"]["test"]) is (
@@ -170,6 +157,69 @@ def test_rendered_tooling_is_complete(
     assert "workflow_dispatch" in events
     assert "branches" not in events["push"]
     assert "scripts.release --dry-run" in (project / "RELEASING.md").read_text()
+
+
+def test_generated_python_versions(
+    generated: tuple[Path, dict[str, object]],
+) -> None:
+    """Keep the supported versions, default interpreter, and tools in sync."""
+    project, data = generated
+    with (project / "pyproject.toml").open("rb") as stream:
+        config = tomllib.load(stream)
+    target_python = data.get("target_python", "py315")
+    minimum_python = data.get("minimum_python", "3.13")
+    assert isinstance(target_python, str)
+    assert isinstance(minimum_python, str)
+    python_versions = [f"3.{minor}" for minor in range(int(minimum_python[2:]), 16)]
+    assert config["tool"]["ruff"]["target-version"] == target_python
+    assert config["tool"]["mypy"]["python_version"] == f"3.{target_python[3:]}"
+    assert (project / ".python-version").read_text() == f"3.{target_python[3:]}\n"
+    assert config["project"]["requires-python"] == f">={minimum_python}"
+    classifiers = config["project"]["classifiers"]
+    for minor in range(12, 16):
+        classifier = f"Programming Language :: Python :: 3.{minor}"
+        assert (classifier in classifiers) is (f"3.{minor}" in python_versions)
+    checks_workflow = yaml.safe_load(
+        (project / ".github/workflows/checks.yaml").read_text()
+    )
+    tests_job = checks_workflow["jobs"]["tests"]
+    assert tests_job["strategy"]["matrix"]["python_version"] == python_versions
+    if "docs" in data.get("features", ["tasks", "docs"]):
+        coverage_step = next(
+            step
+            for step in tests_job["steps"]
+            if step.get("name") == "Store coverage data for documentation"
+        )
+        assert (
+            coverage_step["if"]
+            == f"${{{{ matrix.python_version == '{minimum_python}' }}}}"
+        )
+    if "tasks" in data.get("features", ["tasks", "docs"]):
+        assert (
+            f'# requires-python = ">={minimum_python}"'
+            in (project / "noxfile.py").read_text()
+        )
+        assert f"tests-{minimum_python}" in (project / "README.md").read_text()
+
+
+def test_target_below_minimum_is_rejected(
+    tmp_path: Path, template_source: Path
+) -> None:
+    """The default interpreter must satisfy the project's minimum version."""
+    with pytest.raises(ValueError, match="at least the minimum supported version"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "example-package",
+                "project_description": "Example package",
+                "minimum_python": "3.15",
+                "target_python": "py314",
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
 
 
 def test_generated_branch_and_changelog(

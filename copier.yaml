@@ -84,14 +84,27 @@ changelog:
   help: Use a changelog and Towncrier?
   default: true
 
+minimum_python:
+  type: str
+  help: What is the minimum supported Python version?
+  default: "3.13"
+  choices:
+    Python 3.13: "3.13"
+    Python 3.14: "3.14"
+    Python 3.15: "3.15"
+
 target_python:
   type: str
-  help: Which Python version should tools target?
-  default: py314
+  help: Which Python version should development tools and the default interpreter target?
+  default: py315
   choices:
     Python 3.13: py313
     Python 3.14: py314
     Python 3.15: py315
+  validator: >-
+    {% if target_python[3:] | int < minimum_python.split('.')[1] | int %}
+    The target Python version must be at least the minimum supported version.
+    {% endif %}
 
 pytest_testmon:
   type: str

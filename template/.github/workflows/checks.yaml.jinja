@@ -67,7 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ['3.13', '3.14', '3.15']
+        python_version: [{% for minor in range(minimum_python.split('.')[1] | int, 16) %}'3.{{ minor }}'{% if not loop.last %}, {% endif %}{% endfor %}]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -90,7 +90,7 @@ jobs:
 {% endif -%}
 {% if docs %}
       - name: Store coverage data for documentation
-        if: {% raw %}${{ matrix.python_version == '3.13' }}{% endraw %}
+        if: {% raw %}${{ matrix.python_version == '{% endraw %}{{ minimum_python }}{% raw %}' }}{% endraw %}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data

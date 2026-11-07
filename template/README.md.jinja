@@ -51,7 +51,7 @@ make check-dist
 ```
 {% if tasks == "nox" %}
 Use `make nox` for the supported-Python test matrix and
-`uv run noxfile.py -s tests-3.13 -- tests/` for a focused Nox run.
+`uv run noxfile.py -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
 {% endif -%}
 {% if docs %}
 Use `make docs` for a strict documentation build and `make docs-serve` for
