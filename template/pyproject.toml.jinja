@@ -220,6 +220,10 @@ run.omit = [
 ]
 run.branch = true
 run.dynamic_context = "test_function"
+run.disable_warnings = [
+  "module-not-imported",
+  "no-data-collected",
+]
 run.patch = [
   "subprocess",
 ]
