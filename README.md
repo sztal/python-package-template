@@ -64,10 +64,23 @@ copier copy --trust gh:sztal/python-package-template ./path/to/project
 copier copy --trust git@github.com:sztal/python-package-template ./path/to/project
 ```
 
+For a Git-backed template, Copier selects the latest release tag by default,
+including when the source is a local directory. To use the current local
+revision instead, run:
+
+```bash
+copier copy --trust --vcs-ref=HEAD /path/to/python-package-template ./path/to/project
+```
+
+Mamba support was added after the `v0.1` tag, so it requires a newer revision.
+When using a remote source, that revision must also be available on the remote.
+
 Copier asks for the visible project choices and applies defaults for derived
 values. Important choices include:
 
 - `project_name` and `project_description`: project metadata and documentation
+- `distribution_name`: the name used by pip, defaulting to a slug of
+  `project_name`; it can differ from the import name
 - `integration_branch`: the integration branch name, defaulting to `master`
 - `public_github`: assume a public GitHub repository (default: enabled);
   disabling it avoids generated public repository and Pages URLs
@@ -108,6 +121,11 @@ Names, repository URLs, package paths, documentation URLs, copyright details,
 and similar values are derived from the answers. The Git name and email used
 as defaults come from the local Git configuration.
 
+For example, set `project_name` to `common`, `distribution_name` to
+`montec-common`, `package_type` to `namespace`, and `namespace_name` to
+`montec` to create the distribution `montec-common` with import name
+`montec.common`. Copier saves the distribution name for subsequent updates.
+
 To provide answers non-interactively, pass Copier data explicitly:
 
 ```bash
@@ -135,6 +153,9 @@ package layout or documentation settings.
 Existing projects using `main` should set `integration_branch=main` when
 updating; the new default is `master`. Review existing changelog files when
 disabling changelog support, as project-specific files may be preserved.
+The newly visible `distribution_name` defaults to the slug of `project_name`;
+if an existing project used a different distribution name, enter it when
+prompted and review the update diff.
 Review the update diff when disabling public GitHub, Actions, publishing, or
 a license: Copier can preserve locally modified files. Existing projects keep
 their saved answers; review the selected manager and regenerate its lockfile

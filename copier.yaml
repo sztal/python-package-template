@@ -53,9 +53,17 @@ project_name:
 
 distribution_name:
   type: str
-  help: Your distribution name.
+  help: What is the distribution name (used by pip)?
   default: "{{ project_name | slugify }}"
-  when: false
+  validator: >-
+    {% set alphanumeric = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' %}
+    {% set allowed = alphanumeric ~ '._-' %}
+    {% if not distribution_name
+       or distribution_name[0] not in alphanumeric
+       or distribution_name[-1] not in alphanumeric
+       or distribution_name | select('in', allowed) | list | length != distribution_name | length %}
+    Enter a distribution name using letters, numbers, dots, underscores, and hyphens, starting and ending with a letter or number.
+    {% endif %}
 
 package_name:
   type: str

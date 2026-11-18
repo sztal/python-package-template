@@ -387,6 +387,104 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
         assert f"::: {import_name}" in (project / "docs/reference/api.md").read_text()
 
 
+@pytest.mark.parametrize(
+    ("distribution_name", "package_manager"),
+    [(None, "uv"), ("montec-common", "uv"), ("montec.common", "pixi")],
+)
+def test_namespace_distribution_name(
+    tmp_path: Path,
+    template_source: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    distribution_name: str | None,
+    package_manager: str,
+) -> None:
+    """Keep the saved distribution name distinct from the namespace import."""
+    project = tmp_path / "project"
+    data: dict[str, object] = {
+        "project_name": "common",
+        "project_description": "Example package",
+        "package_layout": "src",
+        "package_type": "namespace",
+        "namespace_name": "montec",
+        "package_manager": package_manager,
+        "features": [],
+        "entry_points": ["cli"],
+        "cli": "argparse",
+    }
+    if distribution_name is not None:
+        data["distribution_name"] = distribution_name
+    expected_name = distribution_name or "common"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data=data,
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    copier.run_recopy(project, defaults=True, overwrite=True, unsafe=True, quiet=True)
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text())
+    assert answers["distribution_name"] == expected_name
+    config = tomllib.loads((project / "pyproject.toml").read_text())
+    assert config["project"]["name"] == expected_name
+    assert config["project"]["scripts"][expected_name] == "montec.common.cli:main"
+    if package_manager == "pixi":
+        assert expected_name in config["tool"]["pixi"]["pypi-dependencies"]
+    assert (project / "src/montec/common/__init__.py").is_file()
+    assert not (project / "src/montec/__init__.py").exists()
+
+    monkeypatch.setenv("UV_DYNAMIC_VERSIONING_BYPASS", "1.2.3")
+    subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "hatchling", "build", "-t", "wheel"],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    (wheel,) = (project / "dist").glob("*.whl")
+    installed = project / "installed"
+    shutil.unpack_archive(wheel, installed, "zip")
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            (
+                "import importlib.metadata, sys; sys.path.insert(0, sys.argv[1]); "
+                "import montec.common; "
+                "assert montec.common.__version__ == '1.2.3'; "
+                "assert importlib.metadata.metadata(sys.argv[2])['Name'] == sys.argv[2]"
+            ),
+            str(installed),
+            expected_name,
+        ],
+        cwd=project.parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize("name", ["", ".bad", "bad-", "bad/name", "bad name", '"bad"'])
+def test_invalid_distribution_name_is_rejected(
+    tmp_path: Path, template_source: Path, name: str
+) -> None:
+    """Reject distribution names that cannot be used in package metadata."""
+    with pytest.raises(ValueError, match="Enter a distribution name"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "common",
+                "project_description": "Example package",
+                "distribution_name": name,
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
+
+
 def test_built_wheel_preserves_import_path(
     generated: tuple[Path, dict[str, object]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -593,6 +691,7 @@ def test_legacy_namespace_answers_migrate_on_recopy(
     answers["package_layout"] = "namespace"
     answers["namespace_name"] = "example_namespace"
     del answers["package_type"]
+    del answers["distribution_name"]
     answer_file.write_text(yaml.safe_dump(answers))
     data = {"package_layout": layout} if layout == "src" else None
     copier.run_recopy(
@@ -602,6 +701,7 @@ def test_legacy_namespace_answers_migrate_on_recopy(
     assert migrated["package_layout"] == layout
     assert migrated["package_type"] == "namespace"
     assert migrated["namespace_name"] == "example_namespace"
+    assert migrated["distribution_name"] == "example-package"
     prefix = "src/" if layout == "src" else ""
     assert (
         project / f"{prefix}example_namespace/example_package/__init__.py"

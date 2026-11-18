@@ -64,9 +64,9 @@ urls.Issues = "{{ repository_url }}/issues"
 urls.Repository = "{{ repository_url }}"
 {%- endif %}
 {% if cli == 'typer' or cli == 'cyclopts' -%}
-scripts.{{ distribution_name }} = "{{ import_name }}.cli:app"
+scripts.{{ distribution_name | tojson }} = "{{ import_name }}.cli:app"
 {% elif cli -%}
-scripts.{{ distribution_name }} = "{{ import_name }}.cli:main"
+scripts.{{ distribution_name | tojson }} = "{{ import_name }}.cli:main"
 {% endif %}
 [dependency-groups]
 dev = [
@@ -134,7 +134,7 @@ build.targets.wheel.packages = [
 [tool.pixi]
 workspace.channels = [ "conda-forge" ]
 workspace.platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
-pypi-dependencies.{{ distribution_name }} = { path = ".", editable = true }
+pypi-dependencies.{{ distribution_name | tojson }} = { path = ".", editable = true }
 feature.development.dependencies.python = "3.{{ target_python[3:] }}.*"
 {% for minor in range(minimum_python.split('.')[1] | int, 16) %}feature.py3{{ minor }}.dependencies.python = "3.{{ minor }}.*"
 {% endfor %}environments.default = { features = [ "development", "dev"{% if docs %}, "docs"{% endif %} ] }
