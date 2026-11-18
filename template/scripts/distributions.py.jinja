@@ -6,6 +6,9 @@ import argparse
 import os
 import re
 import subprocess
+{% if package_manager == 'pixi' -%}
+import sys
+{% endif -%}
 import tarfile
 import zipfile
 from email.message import Message
@@ -68,8 +71,10 @@ def metadata(path: Path) -> Message:
             required = {f"{WHEEL_PATH}/__init__.py", f"{WHEEL_PATH}/py.typed"}
             if len(entries) != 1 or not required.issubset(names):
                 raise ValueError(f"{path.name} is missing package files or metadata")
+{% if license != 'none' %}
             if not any(".dist-info/licenses/" in name for name in names):
                 raise ValueError(f"{path.name} is missing its license")
+{% endif %}
             return BytesParser().parsebytes(archive.read(entries[0]))
     with tarfile.open(path) as archive:
         names = archive.getnames()
@@ -80,7 +85,9 @@ def metadata(path: Path) -> Message:
                 "PKG-INFO",
                 "pyproject.toml",
                 "README.md",
+{%- if license != 'none' %}
                 "LICENSE",
+{%- endif %}
                 f"{SOURCE_PATH}/__init__.py",
                 f"{SOURCE_PATH}/py.typed",
             )
@@ -138,11 +145,17 @@ def check(directory: Path, tag: str | None = None) -> None:
         output = root / "rebuilt"
         subprocess.run(
             [
+{%- if package_manager == 'uv' %}
                 "uv",
                 "build",
                 "--no-sources",
+{%- else %}
+                sys.executable,
+                "-m",
+                "build",
+{%- endif %}
                 "--wheel",
-                "--out-dir",
+                "{{ '--out-dir' if package_manager == 'uv' else '--outdir' }}",
                 str(output),
                 str(sdist.resolve()),
             ],
@@ -168,12 +181,20 @@ def check(directory: Path, tag: str | None = None) -> None:
                 raise ValueError(f"Rebuilt wheel differs in {field}")
         for index, artifact in enumerate((wheel.resolve(), rebuilt)):
             environment = root / f"venv-{index}"
+{% if package_manager == 'uv' %}
             subprocess.run(["uv", "venv", str(environment)], check=True)
+{% else %}
+            subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
+{% endif %}
             python = environment / (
                 "Scripts/python.exe" if os.name == "nt" else "bin/python"
             )
             subprocess.run(
+{%- if package_manager == 'uv' %}
                 ["uv", "pip", "install", "--python", str(python), str(artifact)],
+{%- else %}
+                [str(python), "-m", "pip", "install", str(artifact)],
+{%- endif %}
                 check=True,
             )
             subprocess.run(

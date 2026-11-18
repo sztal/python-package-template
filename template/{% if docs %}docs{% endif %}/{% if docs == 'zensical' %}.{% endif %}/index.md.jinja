@@ -4,29 +4,47 @@ icon: lucide/house
 
 # {{ project_name }}
 
+{% if pypi_publish -%}
 [![PyPI](https://img.shields.io/pypi/v/{{ distribution_name }})](https://pypi.org/project/{{ distribution_name }}/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/{{ distribution_name }}?logo=python)](https://pypi.org/project/{{ distribution_name }}/)
+{% endif -%}
+{% if public_github and github_actions -%}
 [![CI](https://img.shields.io/github/actions/workflow/status/{{ repository_path }}/ci.yaml?branch={{ integration_branch }}&logo=github&label=CI)](https://github.com/{{ repository_path }}/actions/workflows/ci.yaml)
+{% endif -%}
+{% if public_github and license != 'none' -%}
 [![License](https://img.shields.io/github/license/{{ repository_path }})](https://github.com/{{ repository_path }}/blob/{{ integration_branch }}/LICENSE)
+{% endif -%}
 [![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+{% if package_manager == 'uv' -%}
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+{% endif -%}
 {% if project_description %}
 {{ project_description }}.
 {% endif %}
 ## Installation
 
-Install `{{ distribution_name }}` using [pip](https://pip.pypa.io/) or [uv](https://docs.astral.sh/uv/):
+{% if pypi_publish -%}
+Install `{{ distribution_name }}` using [pip](https://pip.pypa.io/):
 
 ```
 pip install {{ distribution_name }}
 ```
+{% else -%}
+Install from a local checkout with `pip install .`.
+{% endif -%}
 {% if cli %}
 ## Execution
 
+{% if pypi_publish and package_manager == 'uv' -%}
 Execute `{{ distribution_name }}` using [uvx](https://docs.astral.sh/uv/):
 
 ```
 uvx {{ distribution_name }}
 ```
+{% elif package_manager == 'pixi' -%}
+Run `pixi run {{ distribution_name }}` from the project.
+{% else -%}
+After installing the package, run `{{ distribution_name }}`.
+{% endif -%}
 {% endif -%}

@@ -606,3 +606,120 @@ def test_legacy_namespace_answers_migrate_on_recopy(
     assert (
         project / f"{prefix}example_namespace/example_package/__init__.py"
     ).is_file()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"public_github": False},
+        {"public_github": False, "github_actions": True, "pypi_publish": False},
+        {"public_github": False, "github_actions": True, "pypi_publish": True},
+        {"public_github": False, "pypi_publish": True, "license": "none"},
+        {"github_actions": False, "pypi_publish": True, "package_manager": "pixi"},
+        {
+            "pypi_publish": False,
+            "license": "none",
+            "package_manager": "pixi",
+            "changelog": False,
+            "features": [],
+        },
+        {"package_manager": "pixi", "features": ["docs"]},
+    ],
+)
+def test_optional_integrations(
+    tmp_path: Path, template_source: Path, options: dict[str, object]
+) -> None:
+    """Render independent integration choices without stale generated references."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "user_name": "Test User",
+            "user_email": "test@example.invalid",
+            "github_user": "example",
+            **options,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    public = options.get("public_github", True)
+    actions = options.get("github_actions", public)
+    publishing = options.get("pypi_publish", public)
+    licensed = options.get("license", "MIT") != "none"
+    docs = "docs" in options.get("features", ["tasks", "docs"])
+    pixi = options.get("package_manager", "uv") == "pixi"
+    config = tomllib.loads((project / "pyproject.toml").read_text())
+    assert (project / "LICENSE").exists() is licensed
+    assert ("license" in config["project"]) is licensed
+    assert (project / ".github/workflows/ci.yaml").exists() is actions
+    assert (project / ".github/workflows/release.yaml").exists() is (
+        actions and publishing
+    )
+    assert (project / ".github/workflows/pages.yaml").exists() is (
+        actions and public and docs
+    )
+    assert (project / "scripts/publish.py").exists() is publishing
+    assert (project / "docs/license.md").exists() is (docs and licensed)
+    assert ("pixi" in config["tool"]) is pixi
+    assert ("urls" in config["project"]) is public
+    if not public:
+        for path in (project / "README.md", project / "pyproject.toml"):
+            assert "github.com/example/example-package" not in path.read_text()
+    for path in project.rglob("*.py"):
+        py_compile.compile(str(path), doraise=True)
+    for path in (project / ".github/workflows").glob("*.yaml"):
+        assert isinstance(yaml.safe_load(path.read_text()), dict)
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            "/dev/null",
+            "tests/test_release_tools.py",
+            "-q",
+        ],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_recopy_disables_public_integrations(
+    tmp_path: Path, template_source: Path
+) -> None:
+    """Saved default projects can explicitly switch off public integrations."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "github_user": "example",
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    copier.run_recopy(
+        project,
+        data={"public_github": False, "github_actions": False, "pypi_publish": False},
+        defaults=True,
+        overwrite=True,
+        unsafe=True,
+        quiet=True,
+    )
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text())
+    assert answers["public_github"] is False
+    assert answers["github_actions"] is False
+    assert answers["pypi_publish"] is False
+    assert (
+        "github.com/example/example-package" not in (project / "README.md").read_text()
+    )

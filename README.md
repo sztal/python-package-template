@@ -69,6 +69,15 @@ values. Important choices include:
 
 - `project_name` and `project_description`: project metadata and documentation
 - `integration_branch`: the integration branch name, defaulting to `master`
+- `public_github`: assume a public GitHub repository (default: enabled);
+  disabling it avoids generated public repository and Pages URLs
+- `github_actions` and `pypi_publish`: generate Actions and configure explicit
+  PyPI publishing; both default to the value of `public_github` and can be
+  overridden independently. Without Actions, publishing uses Twine locally.
+- `license`: select an open-source license (default: MIT) or no license;
+  no license does not prevent publishing or make a project private
+- `package_manager`: choose uv (default) or Pixi. Pixi uses locked environments
+  for Nox; update its lockfile explicitly to change dependencies.
 - `changelog`: enable changelog and Towncrier support (default: enabled);
   fragments are written at integration-branch merge time from the incoming
   branch's Git history and assembled for releases
@@ -121,6 +130,10 @@ package layout or documentation settings.
 Existing projects using `main` should set `integration_branch=main` when
 updating; the new default is `master`. Review existing changelog files when
 disabling changelog support, as project-specific files may be preserved.
+Review the update diff when disabling public GitHub, Actions, publishing, or
+a license: Copier can preserve locally modified files. Existing projects keep
+their saved answers; review the selected manager and regenerate its lockfile
+if switching between uv and Pixi.
 
 For projects generated with the former `package_layout: namespace` option,
 Copier defaults to a flat namespace package on update. This corrects the
@@ -210,20 +223,21 @@ directory:
 - a flat or `src/` package directory, optionally under an implicit namespace:
   selected independently by `package_layout` and `package_type`;
 - `tests/`: pytest fixtures and version checks;
-- `noxfile.py`: test, lint, type-check, and documentation sessions using uv;
+- `noxfile.py`: optional test, lint, type-check, and documentation sessions
+  using the selected package manager;
 - `.pre-commit-config.yaml`: Ruff checking and formatting plus repository
   hygiene hooks;
 - `Makefile`: commands for installation, testing, linting, type checking,
   coverage, distribution validation, documentation, and release preparation;
 - `docs/` and `zensical.toml`: optional Zensical documentation support;
-- `.github/workflows/`: shared CI checks, optional Pages deployment, and
+- `.github/workflows/`: optional shared CI checks, optional Pages deployment, and
   explicitly dispatched package publication;
 - `AGENTS.md` and `.github/skills/`: generated repository context and
   on-demand workflows for development, audits, wiki notes, package builds,
   branch integration, and releases, including a first-run inspection checklist;
 - `scripts/` and `RELEASING.md`: distribution checks, local Git-tag release
-  preparation, and explicit Trusted Publishing guidance;
-- `LICENSE`, optional `CHANGELOG.md`, and optional `CODE_OF_CONDUCT.md`.
+  preparation, and optional explicit publication guidance;
+- optional `LICENSE`, `CHANGELOG.md`, and `CODE_OF_CONDUCT.md`.
 
 The generated build uses Git tags as its version source. A release tag such as
 `v1.2.3` produces package metadata with version `1.2.3`.

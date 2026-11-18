@@ -1,3 +1,4 @@
+{% if github_actions -%}
 """Verify release tags and explicitly dispatch package publishing."""
 
 from __future__ import annotations
@@ -50,11 +51,13 @@ def notes(directory: Path, tag: str) -> str:
     if version.is_prerelease:
         return subprocess.check_output(
             [
-                "uv",
+                "{{ package_manager }}",
                 "run",
                 "--locked",
+{%- if package_manager == 'uv' %}
                 "--group",
                 "release",
+{%- endif %}
                 "towncrier",
                 "build",
                 "--version",
@@ -66,7 +69,7 @@ def notes(directory: Path, tag: str) -> str:
         )
     changelog = git(directory, "show", f"refs/tags/{tag}:CHANGELOG.md")
     lines = changelog.splitlines()
-    heading = f"## [{version}]"
+    heading = f"## {% if public_github %}[{version}]{% else %}{version} -{% endif %}"
     for index, line in enumerate(lines):
         if line.startswith(heading):
             end = next(
@@ -169,3 +172,41 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+{%- else -%}
+"""Explicitly publish locally validated release artifacts."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+from pathlib import Path
+
+from scripts import distributions
+
+
+def publish(tag: str) -> None:
+    """Validate and upload the tagged distributions to the appropriate index."""
+    version = distributions.release_version(tag)
+    directory = Path("dist")
+    distributions.check(directory, tag)
+    wheel, sdist = distributions.inspect(directory, tag)
+    command = ["twine", "upload"]
+    if version.is_prerelease:
+        command.extend(["--repository", "testpypi"])
+    subprocess.run([*command, str(wheel), str(sdist)], check=True)
+
+
+def main() -> None:
+    """Publish only when explicitly invoked."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("tag", nargs="?", default=os.environ.get("TAG"))
+    args = parser.parse_args()
+    if not args.tag:
+        parser.error("Provide a tag or set TAG")
+    publish(args.tag)
+
+
+if __name__ == "__main__":
+    main()
+{%- endif %}

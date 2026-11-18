@@ -21,15 +21,29 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
+{% if package_manager == 'uv' %}
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.9.14
     hooks:
       - id: uv-lock
+{% else %}
+  - repo: local
+    hooks:
+      - id: pixi-lock
+        name: Check Pixi lockfile
+        entry: pixi run --locked python -c pass
+        language: system
+        files: ^(pyproject\.toml|pixi\.lock)$
+        pass_filenames: false
+{% endif %}
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
+{% if package_manager == 'pixi' %}
+        exclude: ^pixi\.lock$
+{% endif %}
         additional_dependencies:
           - tomli
 

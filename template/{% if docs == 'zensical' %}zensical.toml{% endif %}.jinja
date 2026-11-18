@@ -2,11 +2,15 @@
 site_name = "{{ project_name }}"
 site_description = "{{ project_description }}"
 site_author = "{{ user_name }}"
+{% if public_github and github_actions -%}
 site_url = "{{ documentation_url }}/"
+{% endif -%}
 copyright = "Copyright &copy; {{ copyright_year }} {{ copyright_owner }}"
+{% if public_github -%}
 repo_url =  "{{ repository_url }}"
 repo_name = "{{ repository_path }}"
 edit_uri = "edit/{{ integration_branch }}/docs/"
+{% endif -%}
 nav = [
   { "Home" = [
     "index.md",
@@ -14,7 +18,9 @@ nav = [
     { "Release notes" = "changelog.md" },
 {% endif %}
     { "Building and releasing" = "releasing.md" },
+{% if license != 'none' %}
     { "License" = "license.md" },
+{% endif %}
   ] },
   { "Reference" = [
     "reference/index.md",
@@ -62,9 +68,11 @@ toggle.name = "Switch to light mode"
 text = "Inter"
 code = "JetBrains Mono"
 
+{% if public_github -%}
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
 link = "{{ repository_url }}"
+{% endif %}
 
 [project.markdown_extensions]
 admonition = {}

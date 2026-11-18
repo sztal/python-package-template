@@ -26,6 +26,7 @@ _message_after_copy: |
      $ git init
      $ git branch -M {{ integration_branch }}
 
+  {% if public_github %}
   3. Add your GitHub repository to remotes:
 
      $ git remote add origin {{ repository_url }}.git
@@ -35,6 +36,12 @@ _message_after_copy: |
      $ git add .
      $ git commit -m "Initial commit"
      $ git push -u origin {{ integration_branch }}
+  {% else %}
+  3. Commit the generated project:
+
+     $ git add .
+     $ git commit -m "Initial commit"
+  {% endif %}
 
 project_name:
   type: str
@@ -59,6 +66,29 @@ package_name:
 project_description:
   type: str
   help: Your project description?
+
+public_github:
+  type: bool
+  help: Will this project have a public GitHub repository?
+  default: true
+
+github_actions:
+  type: bool
+  help: Generate GitHub Actions workflows?
+  default: "{{ public_github }}"
+
+pypi_publish:
+  type: bool
+  help: Set up PyPI publishing?
+  default: "{{ public_github }}"
+
+package_manager:
+  type: str
+  help: Which package manager do you want to use?
+  default: uv
+  choices:
+    uv: uv
+    Pixi: pixi
 
 integration_branch:
   type: str
@@ -129,23 +159,24 @@ github_user:
   type: str
   help: Your GitHub username?
   default: sztal
+  when: "{{ public_github }}"
 
 repository_path:
   type: str
   help: Your GitHub repository path.
-  default: "{{ github_user }}/{{ distribution_name }}"
+  default: "{{ (github_user ~ '/' ~ distribution_name) if public_github else '' }}"
   when: false
 
 repository_url:
   type: str
   help: Your GitHub repository URL.
-  default: "https://github.com/{{ repository_path }}"
+  default: "{{ ('https://github.com/' ~ repository_path) if public_github else '' }}"
   when: false
 
 documentation_url:
   type: str
   help: Your GitHub Pages URL.
-  default: "https://{{ github_user }}.github.io/{{ distribution_name }}"
+  default: "{{ ('https://' ~ github_user ~ '.github.io/' ~ distribution_name) if public_github else '' }}"
   when: false
 
 copyright_owner:
@@ -171,6 +202,7 @@ license:
     GNU Lesser General Public License v3.0 only: LGPL-3.0
     MIT License: MIT
     Mozilla Public License 2.0: MPL-2.0
+    No license: none
 
 dynamic_version:
   type: bool
@@ -284,7 +316,7 @@ install:
   type: str
   help: How do you want to install dependencies when running tasks?
   default: uv sync
-  when: "{{ tasks }}"
+  when: "{{ tasks and package_manager == 'uv' }}"
   choices:
     Install latest versions: uv pip
     Install locked versions: uv sync

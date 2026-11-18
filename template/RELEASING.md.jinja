@@ -3,7 +3,8 @@
 This project uses `{{ integration_branch }}` for integration and annotated Git tags for versions.
 Hatchling and `uv-dynamic-versioning` derive the package version from Git;
 do not manually edit a version field or use a version override for releases.
-Run `uv lock` and commit `uv.lock` before using the release workflow.
+Run `{{ 'uv lock' if package_manager == 'uv' else 'pixi install' }}` and commit
+`{{ package_manager }}.lock` before preparing a release.
 
 ## Development and validation
 
@@ -14,7 +15,6 @@ Towncrier fragments under `changelog.d/` describing its user-visible changes,
 using the categories configured in `pyproject.toml`. Do not add fragments for
 each change or commit, or for merges into other branches.
 {% endif %}
-
 ```console
 make test
 make lint
@@ -37,32 +37,37 @@ match.
 {% if tasks == "nox" %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example
-`uv run noxfile.py -s tests-{{ minimum_python }} -- tests/test_version.py`.
+`{{ 'uv run noxfile.py' if package_manager == 'uv' else 'pixi run --locked nox' }} -s tests-{{ minimum_python }} -- tests/test_version.py`.
 {% endif -%}
 {% if docs %}
 ## Documentation
 
 Use `make docs` for a clean, strict Zensical build and `make docs-serve` for a
-local preview. CI validates documentation on pull requests and publishes the
-validated `{{ integration_branch }}` commit to GitHub Pages after checks succeed. A successful
-final PyPI release also deploys the tagged documentation. TestPyPI releases
-do not deploy it. Coverage data from the same validation run produces
+local preview.
+{% if github_actions and public_github %}
+CI validates documentation on pull requests and publishes the
+validated `{{ integration_branch }}` commit to GitHub Pages after checks succeed.
+{% if pypi_publish -%}
+A successful final PyPI release also deploys the tagged documentation. TestPyPI releases
+do not deploy it. {% endif -%}
+Coverage data from the same validation run produces
 `coverage/` and `coverage.svg` on the site.
 
 In repository settings, choose GitHub Actions as the Pages source and allow
 the `github-pages` environment to deploy from `{{ integration_branch }}`.
-{% endif %}
+{% endif %}{% endif %}
 ## Prepare a release
 
 Use canonical `X.Y.Z` versions, optionally followed by `aN`, `bN`, or `rcN`.
-Start on clean `{{ integration_branch }}` containing `origin/{{ integration_branch }}`, with a committed lockfile.
-Versions must advance existing local and remote tags.
+Start on clean `{{ integration_branch }}` with a committed lockfile. If an
+`origin` remote is configured, the branch must contain its integration branch.
+Versions must advance existing local tags and, when configured, remote tags.
 
 ```console
 {% if changelog -%}
 make release-notes VERSION=1.2.0
 {% endif -%}
-uv run --group release python -m scripts.release --dry-run 1.2.0
+{{ 'uv run --group release' if package_manager == 'uv' else 'pixi run --locked' }} python -m scripts.release --dry-run 1.2.0
 make release VERSION=1.2.0
 ```
 
@@ -72,29 +77,40 @@ consumes pending fragments into the changelog; a prerelease keeps them.
 {% endif -%}
 Successful preparation advances local `{{ integration_branch }}` and creates an annotated tag,
 but does not push, publish, or create a GitHub release. The command prints
-the explicit atomic push command. Pushing the tag only validates it.
+an explicit atomic push command when `origin` is configured.
 
+{% if pypi_publish -%}
 ## Publish explicitly
 
-After pushing the prepared commit and tag, run:
+{% if github_actions %}After pushing the prepared commit and tag{% else %}After preparing the commit and tag locally{% endif %}, run:
 
 ```console
 make publish TAG=v1.2.0
 ```
 
+{% if github_actions -%}
 The command requires the GitHub CLI, dispatches the release workflow, and
 watches that specific run. Prereleases go to TestPyPI; final releases go to
 PyPI. CI builds and checks fresh artifacts from the tagged commit and uploads
 those exact files. It creates a GitHub release only after publication succeeds.
 {% if not changelog %}GitHub generates the release notes from the repository history.
 {% endif %}
-
 Configure Trusted Publishing on PyPI and TestPyPI for repository
-`{{ repository_path }}`, workflow `release.yaml`, and the corresponding
+{% if public_github %}`{{ repository_path }}`{% else %}your GitHub repository{% endif %}, workflow `release.yaml`, and the corresponding
 `pypi` and `testpypi` GitHub environments. Configure each index separately;
 the workflow uses OIDC and does not require long-lived API tokens.
-
+{% else -%}
+The command checks the tag and validates the existing distributions before
+uploading them with Twine. Prereleases go to TestPyPI; final releases go to
+PyPI. Configure Twine authentication externally; do not commit credentials.
+{% endif -%}
+{% endif -%}
 If preparation fails, inspect the retained checkout path printed by the tool.
+{% if pypi_publish and github_actions -%}
 If a dispatch times out or publication partially succeeds, inspect the named
 Actions run and package index before retrying. Do not move or recreate tags or
 blindly upload a different artifact under an existing version.
+{% elif pypi_publish -%}
+If publication fails, inspect the package index before retrying. Do not blindly
+upload different artifacts under an existing version.
+{% endif -%}

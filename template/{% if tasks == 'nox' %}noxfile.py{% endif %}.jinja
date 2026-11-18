@@ -1,3 +1,4 @@
+{% if package_manager == 'uv' -%}
 # /// script
 # requires-python = ">={{ minimum_python }}"
 # dependencies = [
@@ -162,3 +163,94 @@ def uv_sync(*args: str, session: nox.Session) -> None:
 {% endif %}
 if __name__ == "__main__":
     nox.main()
+{%- else -%}
+"""Task automation using locked Pixi environments."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import nox
+
+nox.options.sessions = (
+    "lint",
+    "typecheck",
+{% if docs %}    "docs",
+{% endif %}{% for minor in range(minimum_python.split('.')[1] | int, 16) %}    "tests-3.{{ minor }}",
+{% endfor %})
+
+
+def run_tests(session: nox.Session, environment: str) -> None:
+    """Run focused tests or the complete coverage suite."""
+    command = ("pixi", "run", "--locked", "--environment", environment)
+    if session.posargs:
+        session.run(*command, "pytest", *session.posargs)
+        return
+    if os.getenv("COVERAGE_FILE") is None:
+        session.env["COVERAGE_FILE"] = str(Path(session.create_tmp()) / ".coverage")
+    session.run(*command, "coverage", "erase")
+    session.run(
+        *command,
+        "coverage",
+        "run",
+        "-m",
+        "pytest",
+        "--durations",
+        "15",
+        "-n",
+        os.getenv("PYTEST_XDIST_AUTO_NUM_WORKERS") or "auto",
+    )
+    session.run(*command, "coverage", "combine")
+    session.run(*command, "coverage", "report")
+
+{% for minor in range(minimum_python.split('.')[1] | int, 16) %}
+@nox.session(name="tests-3.{{ minor }}", python=False, tags=["tests"])
+def tests_py3{{ minor }}(session: nox.Session) -> None:
+    """Test Python 3.{{ minor }}."""
+    run_tests(session, "py3{{ minor }}")
+
+{% endfor %}
+@nox.session(python=False)
+def lint(session: nox.Session) -> None:
+    """Run pre-commit."""
+    session.run(
+        "pixi", "run", "--locked", "pre-commit", "run", "--all-files", *session.posargs
+    )
+
+
+@nox.session(python=False)
+def typecheck(session: nox.Session) -> None:
+    """Run mypy."""
+    session.run(
+        "pixi",
+        "run",
+        "--locked",
+        "mypy",
+        *(session.posargs or ("{{ package_path }}", "tests", "scripts", "noxfile.py")),
+    )
+{% if docs %}
+
+@nox.session(python=False)
+def docs(session: nox.Session) -> None:
+    """Build the documentation."""
+    session.run(
+        "pixi",
+        "run",
+        "--locked",
+        "zensical",
+        "build",
+        "--clean",
+        "--strict",
+        *session.posargs,
+    )
+
+
+@nox.session(python=False)
+def autodocs(session: nox.Session) -> None:
+    """Serve the documentation."""
+    session.run(
+        "pixi", "run", "--locked", "zensical", "serve", "--open", *session.posargs
+    )
+{%- endif %}
+{%- endif %}

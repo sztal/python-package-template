@@ -18,7 +18,7 @@ destination and version. Do not infer the version from commit messages.
    source and tag convention, changelog policy, distribution names, and what
    each push or release event actually publishes.
 2. Verify the complete working tree, including staged and untracked files;
-   preserve existing work. Check the intended branch against its remote and
+   preserve existing work. Check the intended branch against its remote if configured and
    ensure the version, tag, and any temporary release branch do not already
    exist. Stop on discrepancies rather than overwriting or moving refs.
 3. Run the required tests and checks,{% if changelog %} preview release notes using the
@@ -35,15 +35,20 @@ destination and version. Do not infer the version from commit messages.
 Only perform the authorized release stage. Read `RELEASING.md` for the
 generated workflow. {% if changelog %}`make release-notes VERSION=1.2.0` previews notes;
 {% endif -%}
-`uv run --group release python -m scripts.release --dry-run 1.2.0` rehearses
+`{{ 'uv run --group release' if package_manager == 'uv' else 'pixi run --locked' }} python -m scripts.release --dry-run 1.2.0` rehearses
 in an isolated clone. `make release VERSION=1.2.0` prepares a validated
 commit and annotated tag locally without pushing or publishing.
 
-Push only when requested, using the printed atomic push command. A tag push
-validates but does not publish. Only when publication is explicitly requested,
+Push only when requested, using the printed atomic push command when present.
+{% if pypi_publish -%}
+Only when publication is explicitly requested,
 run `make publish TAG=v1.2.0`: prereleases go to TestPyPI and final releases
-to PyPI. The workflow creates a GitHub release after publication succeeds.
-
+to PyPI. {% if github_actions %}The workflow creates a GitHub release after publication succeeds.
+{% else %}The manual command validates the artifacts before upload.
+{% endif -%}
+{% else -%}
+This project does not configure PyPI publishing.
+{% endif %}
 Use the current project's actual script and workflow if they differ. Do not
 push or upload separately unless requested. A successful push does not prove
 publication succeeded: inspect the relevant workflow runs and package

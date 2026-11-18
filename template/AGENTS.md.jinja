@@ -6,8 +6,9 @@
 - Import package: `{{ import_name }}`
 - Source directory: `{{ package_path }}/`
 - Tests: `tests/`
+{% if public_github -%}
 - Repository: {{ repository_url }}
-
+{% endif %}
 {{ project_description }}
 
 ## Working conventions
@@ -42,45 +43,22 @@ follow-up work.
 
 ## Validation
 
-{% if tasks == "nox" -%}
-Use direct pytest for a focused run and the generated Nox script for checks:
+Run the generated checks:
 
 ```console
-uv run noxfile.py -s lint
-uv run noxfile.py -s typecheck
-uv run pytest
+make lint
+make typecheck
+make test
 ```
-
-Use `uv run noxfile.py -s tests` for the full supported-Python matrix.
-{%- else -%}
-Run the appropriate dependency group directly:
-
-```console
-uv run --group lint pre-commit run --all-files
-uv run --group type mypy {{ package_path }} tests scripts
-uv run --group test pytest
-```
-{%- endif -%}
+{% if tasks == "nox" %}
+Use `make nox` for the supported-Python matrix.
+{% endif %}
 {%- if docs %}
-
 ## Documentation
 
-Documentation lives in `docs/`. Build it with the applicable command below
-before submitting documentation changes.
-{%- if tasks == "tox" %}
+Documentation lives in `docs/`. Build it before submitting documentation changes:
 
 ```console
-uvx tox -e docs
+make docs
 ```
-{%- elif tasks == "nox" %}
-
-```console
-uv run noxfile.py -s docs
-```
-{%- else %}
-
-```console
-uv run --group docs {{ "mkdocs" if docs == "mkdocs" else "zensical" }} build --strict
-```
-{%- endif %}
-{%- endif %}
+{% endif -%}

@@ -1,4 +1,7 @@
-.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release publish
+.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release
+{% if pypi_publish %}
+.PHONY: publish
+{% endif %}
 {% if changelog %}
 .PHONY: release-notes
 {% endif %}
@@ -10,6 +13,7 @@
 {% endif %}
 
 export VERSION TAG
+RUN = {{ 'uv run' if package_manager == 'uv' else 'pixi run --locked' }}
 
 help:
 	@echo "Usage: make <target>"
@@ -39,11 +43,13 @@ help:
 	@echo "  release-notes  Preview notes for VERSION=X.Y.Z"
 {% endif %}
 	@echo "  release        Prepare VERSION locally without publishing"
-	@echo "  publish        Explicitly publish an existing remote TAG"
+{% if pypi_publish %}
+	@echo "  publish        Explicitly publish TAG"
+{% endif %}
 
 init:
 	make install
-	uv run pre-commit install
+	$(RUN) pre-commit install
 
 clean:
 	rm -rf dist/ build/ .nox/ .pytest_cache/ .ruff_cache/ htmlcov/
@@ -53,76 +59,90 @@ clean:
 	find . -name ".coverage*" -delete
 
 build:
+{% if package_manager == 'uv' %}
 	uv build --no-sources
+{% else %}
+	$(RUN) python -m build --sdist --wheel
+{% endif %}
 
 wheel:
+{% if package_manager == 'uv' %}
 	uv build --no-sources --wheel
+{% else %}
+	$(RUN) python -m build --wheel
+{% endif %}
 
 install:
+{% if package_manager == 'uv' %}
 	uv sync --group dev
+{% else %}
+	pixi install
+{% endif %}
 
 test:
-	uv run pytest
+	$(RUN) pytest
 
 {% if tasks == "nox" %}
 nox:
-	uv run noxfile.py -s tests
+	$(RUN) {% if package_manager == 'uv' %}noxfile.py -s tests{% else %}nox --tags tests{% endif %}
 
 {% endif %}
 
 coverage:
-	uv run coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
-	uv run coverage report
+	$(RUN) coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
+	$(RUN) coverage report
 
 coverage-html:
-	uv run coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
-	uv run coverage html
+	$(RUN) coverage run -m pytest{% if pytest_testmon != 'no' %} --no-testmon{% endif %}
+	$(RUN) coverage html
 
 lint:
 {% if tasks == "nox" %}
-	uv run noxfile.py -s lint
+	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s lint
 {% else %}
-	uv run pre-commit run --all-files
+	$(RUN) pre-commit run --all-files
 {% endif %}
 
 format:
-	uv run ruff format .
+	$(RUN) ruff format .
 
 typecheck:
 {% if tasks == "nox" %}
-	uv run noxfile.py -s typecheck
+	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s typecheck
 {% else %}
-	uv run mypy {{ package_path }} tests scripts
+	$(RUN) mypy {{ package_path }} tests scripts
 {% endif %}
 
 {% if docs %}
 docs:
 {% if tasks == "nox" %}
-	uv run noxfile.py -s docs
+	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s docs
 {% else %}
-	uv run --group docs zensical build --clean --strict
+	$(RUN) {% if package_manager == 'uv' %}--group docs {% endif %}zensical build --clean --strict
 {% endif %}
 
 docs-serve:
 {% if tasks == "nox" %}
-	uv run noxfile.py -s autodocs
+	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s autodocs
 {% else %}
-	uv run --group docs zensical serve --open
+	$(RUN) {% if package_manager == 'uv' %}--group docs {% endif %}zensical serve --open
 {% endif %}
 {% endif %}
 check:
-	uv run --group release python -m scripts.check
+	$(RUN) {% if package_manager == 'uv' %}--group release {% endif %}python -m scripts.check
 
 check-dist:
-	uv run --group release python -m scripts.distributions check
+	$(RUN) {% if package_manager == 'uv' %}--group release {% endif %}python -m scripts.distributions check
 
 {% if changelog %}
 release-notes:
-	uv run --group release python -m scripts.release --notes
+	$(RUN) {% if package_manager == 'uv' %}--group release {% endif %}python -m scripts.release --notes
 
 {% endif %}
 release:
-	uv run --group release python -m scripts.release
+	$(RUN) {% if package_manager == 'uv' %}--group release {% endif %}python -m scripts.release
+{%- if pypi_publish %}
 
 publish:
-	uv run --group release python -m scripts.publish
+	$(RUN) {% if package_manager == 'uv' %}--group release {% endif %}python -m scripts.publish
+{%- endif %}

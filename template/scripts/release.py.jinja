@@ -28,30 +28,34 @@ def clean(directory: Path) -> None:
         raise RuntimeError("Release preparation requires a clean working tree")
 
 
-def state(directory: Path) -> tuple[str, str]:
-    """Check that the local integration branch contains its remote."""
+def state(directory: Path) -> tuple[str, str | None]:
+    """Check the integration branch and any configured origin."""
     clean(directory)
     if git(directory, "symbolic-ref", "--short", "HEAD") != INTEGRATION_BRANCH:
         raise RuntimeError(
             f"Release preparation requires the {INTEGRATION_BRANCH} branch"
         )
     head = git(directory, "rev-parse", "HEAD")
-    remote = git(
-        directory,
-        "ls-remote",
-        "--exit-code",
-        "origin",
-        f"refs/heads/{INTEGRATION_BRANCH}",
-    ).split()[0]
-    result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", remote, head], check=False, cwd=directory
-    )
-    if result.returncode:
-        raise RuntimeError(
-            f"Local {INTEGRATION_BRANCH} does not contain origin/{INTEGRATION_BRANCH}; "
-            "fetch and reconcile it"
+    remote = None
+    if "origin" in git(directory, "remote").splitlines():
+        remote = git(
+            directory,
+            "ls-remote",
+            "--exit-code",
+            "origin",
+            f"refs/heads/{INTEGRATION_BRANCH}",
+        ).split()[0]
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", remote, head],
+            check=False,
+            cwd=directory,
         )
-    git(directory, "ls-files", "--error-unmatch", "uv.lock")
+        if result.returncode:
+            raise RuntimeError(
+                f"Local {INTEGRATION_BRANCH} does not contain origin/{INTEGRATION_BRANCH}; "
+                "fetch and reconcile it"
+            )
+    git(directory, "ls-files", "--error-unmatch", "{{ package_manager }}.lock")
     return head, remote
 
 
@@ -59,8 +63,11 @@ def check_available(directory: Path, tag: str) -> None:
     """Reject existing tags and versions that do not advance release tags."""
     version = release_version(tag)
     tags = set(git(directory, "tag", "--list").splitlines())
-    for line in git(directory, "ls-remote", "--tags", "--refs", "origin").splitlines():
-        tags.add(line.split()[1].removeprefix("refs/tags/"))
+    if "origin" in git(directory, "remote").splitlines():
+        for line in git(
+            directory, "ls-remote", "--tags", "--refs", "origin"
+        ).splitlines():
+            tags.add(line.split()[1].removeprefix("refs/tags/"))
     for existing in tags:
         if existing == tag:
             raise ValueError(f"Release tag already exists: {tag}")
@@ -76,11 +83,13 @@ def notes(directory: Path, version: str) -> None:
     """Preview Towncrier notes without changing files."""
     subprocess.run(
         [
-            "uv",
+            "{{ package_manager }}",
             "run",
             "--locked",
+{%- if package_manager == 'uv' %}
             "--group",
             "release",
+{%- endif %}
             "towncrier",
             "build",
             "--version",
@@ -128,11 +137,13 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         else:
             subprocess.run(
                 [
-                    "uv",
+                    "{{ package_manager }}",
                     "run",
                     "--locked",
+{%- if package_manager == 'uv' %}
                     "--group",
                     "release",
+{%- endif %}
                     "towncrier",
                     "build",
                     "--version",
@@ -185,11 +196,12 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         print("Release rehearsal passed; caller files and refs are unchanged")
     else:
         print(f"Prepared {tag} locally; nothing was pushed or published.")
-        print(
-            f"Push explicitly: git push --atomic origin "
-            f"refs/heads/{INTEGRATION_BRANCH}:refs/heads/{INTEGRATION_BRANCH} "
-            f"refs/tags/{tag}:refs/tags/{tag}"
-        )
+        if remote is not None:
+            print(
+                f"Push explicitly: git push --atomic origin "
+                f"refs/heads/{INTEGRATION_BRANCH}:refs/heads/{INTEGRATION_BRANCH} "
+                f"refs/tags/{tag}:refs/tags/{tag}"
+            )
 
 
 def main() -> None:

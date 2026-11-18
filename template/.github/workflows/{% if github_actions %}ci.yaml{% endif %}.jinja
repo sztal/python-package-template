@@ -4,6 +4,9 @@ name: CI
 on:
   push:
     branches: ['{{ integration_branch }}']
+{% if not pypi_publish %}
+    tags: ['v*']
+{% endif %}
   pull_request: null
   workflow_dispatch: null
 
@@ -19,7 +22,10 @@ jobs:
     uses: ./.github/workflows/checks.yaml
     with:
       ref: {% raw %}${{ github.sha }}{% endraw %}
-{% if docs %}
+{% if not pypi_publish %}
+      tag: {% raw %}${{ github.ref_type == 'tag' && github.ref_name || '' }}{% endraw %}
+{% endif -%}
+{% if docs and public_github %}
   pages:
     if: {% raw %}${{ github.event_name == 'push' && github.ref == 'refs/heads/{% endraw %}{{ integration_branch }}{% raw %}' }}{% endraw %}
     needs: checks

@@ -8,6 +8,9 @@ __pycache__/
 # Python environments
 .nox/
 .venv/
+{% if package_manager == 'pixi' -%}
+.pixi/
+{% endif %}
 
 # Python packaging
 dist/

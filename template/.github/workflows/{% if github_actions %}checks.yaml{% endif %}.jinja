@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
-      - uses: astral-sh/setup-uv@v7
+      - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
       - run: make lint
       - run: git diff --exit-code
 
@@ -34,7 +34,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
-      - uses: astral-sh/setup-uv@v7
+      - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
       - run: make typecheck
 {% if docs %}
       - run: make docs
@@ -49,7 +49,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
-      - uses: astral-sh/setup-uv@v7
+      - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
       - run: make build check-dist
         env:
           TAG: {% raw %}${{ inputs.tag }}{% endraw %}
@@ -73,13 +73,13 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
-      - uses: astral-sh/setup-uv@v7
+      - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
 {% if tasks == "nox" %}
-      - run: uv run noxfile.py -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
+      - run: {% if package_manager == 'uv' %}uv run noxfile.py{% else %}pixi run --locked nox{% endif %} -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
         env:
           COVERAGE_FILE: coverage-data
           PYTEST_XDIST_AUTO_NUM_WORKERS: '2'
-{% else %}
+{% elif package_manager == 'uv' %}
       - run: |
           uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage erase
           uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage run -m pytest -n 2
@@ -87,8 +87,18 @@ jobs:
           uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage report
         env:
           COVERAGE_FILE: coverage-data
+{% else %}
+      - run: |
+          environment="py${PYTHON_VERSION/./}"
+          pixi run --locked -e "$environment" coverage erase
+          pixi run --locked -e "$environment" coverage run -m pytest -n 2
+          pixi run --locked -e "$environment" coverage combine
+          pixi run --locked -e "$environment" coverage report
+        env:
+          PYTHON_VERSION: {% raw %}${{ matrix.python_version }}{% endraw %}
+          COVERAGE_FILE: coverage-data
 {% endif -%}
-{% if docs %}
+{% if docs and public_github %}
       - name: Store coverage data for documentation
         if: {% raw %}${{ matrix.python_version == '{% endraw %}{{ minimum_python }}{% raw %}' }}{% endraw %}
         uses: actions/upload-artifact@v4

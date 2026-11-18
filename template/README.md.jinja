@@ -1,30 +1,46 @@
 # {{ project_name }}
 
+{% if pypi_publish -%}
 [![PyPI](https://img.shields.io/pypi/v/{{ distribution_name }})](https://pypi.org/project/{{ distribution_name }}/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/{{ distribution_name }}?logo=python)](https://pypi.org/project/{{ distribution_name }}/)
+{% endif -%}
+{% if public_github and github_actions -%}
 [![CI](https://img.shields.io/github/actions/workflow/status/{{ repository_path }}/ci.yaml?branch={{ integration_branch }}&logo=github&label=CI)](https://github.com/{{ repository_path }}/actions/workflows/ci.yaml)
-{% if docs -%}
+{% endif -%}
+{% if docs and github_actions and public_github -%}
 [![Coverage]({{ documentation_url }}/coverage.svg)]({{ documentation_url }}/coverage/)
 {% endif -%}
+{% if public_github and license != 'none' -%}
 [![License](https://img.shields.io/github/license/{{ repository_path }})](https://github.com/{{ repository_path }}/blob/{{ integration_branch }}/LICENSE)
+{% endif -%}
 [![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+{% if package_manager == 'uv' -%}
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+{% endif -%}
 {% if project_description %}
 {{ project_description }}.
 {% endif %}
 ## Installation
 
-Install `{{ distribution_name }}` using [pip](https://pip.pypa.io/) or [uv](https://docs.astral.sh/uv/):
+{% if pypi_publish -%}
+Install `{{ distribution_name }}` using [pip](https://pip.pypa.io/):
 
 ```
 pip install {{ distribution_name }}
 ```
+{% else -%}
+Install from a local checkout:
 
+```
+pip install .
+```
+{% endif %}
 Import the package as `{{ import_name }}`.
 
 ## Development
 
+{% if package_manager == 'uv' -%}
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and
 create a virtual environment:
 
@@ -40,7 +56,15 @@ uv lock
 uv sync --group dev{% if docs %} --group docs{% endif %}
 ```
 
-Commit `uv.lock` with the project. Run the test suite and checks with:
+{% else -%}
+Install [Pixi](https://pixi.prefix.dev/) and set up the development environment:
+
+```bash
+pixi install
+```
+
+{% endif -%}
+Commit `{{ package_manager }}.lock` with the project. Run the test suite and checks with:
 
 ```bash
 make test
@@ -51,21 +75,32 @@ make check-dist
 ```
 {% if tasks == "nox" %}
 Use `make nox` for the supported-Python test matrix and
-`uv run noxfile.py -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
+`{{ 'uv run noxfile.py' if package_manager == 'uv' else 'pixi run --locked nox' }} -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
 {% endif -%}
 {% if docs %}
 Use `make docs` for a strict documentation build and `make docs-serve` for
-the local preview. GitHub Pages deployment requires configuring the repository
+the local preview.{% if github_actions and public_github %} GitHub Pages deployment requires configuring the repository
 to use GitHub Actions as its Pages source.
+{% endif -%}
 {% endif %}
 See [RELEASING.md](RELEASING.md) for validation, local release preparation,
-and explicit publication.
+{% if pypi_publish %}and explicit publication.{% else %}and artifact checks.{% endif %}
 {% if cli %}
 ## Execution
 
+{% if pypi_publish and package_manager == 'uv' -%}
 Execute `{{ distribution_name }}` using [uvx](https://docs.astral.sh/uv/):
 
 ```
 uvx {{ distribution_name }}
 ```
+{% elif package_manager == 'pixi' -%}
+Run the command from the project environment:
+
+```
+pixi run {{ distribution_name }}
+```
+{% else -%}
+After installing the package, run `{{ distribution_name }}`.
+{% endif -%}
 {% endif -%}

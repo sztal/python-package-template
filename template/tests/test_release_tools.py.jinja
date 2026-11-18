@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import distributions, publish, release
+from scripts import distributions, {% if pypi_publish %}publish, {% endif %}release
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     release.git(project, "init", "-q", "--initial-branch={{ integration_branch }}")
     release.git(project, "config", "user.name", "Release Test")
     release.git(project, "config", "user.email", "release@example.invalid")
-    (project / "uv.lock").write_text("lock\n")
+    (project / "{{ package_manager }}.lock").write_text("lock\n")
     (project / "tracked.txt").write_text("initial\n")
 {% if changelog %}
     (project / "CHANGELOG.md").write_text("# Changelog\n")
@@ -106,7 +106,8 @@ def test_release_rehearsal_preserves_caller(
     assert release.git(repository, "rev-parse", "HEAD") == head
     assert not release.git(repository, "tag", "--list")
     assert not release.git(repository, "status", "--porcelain")
-{% if not changelog %}
+{%- if not changelog %}
+
 
 def test_final_release_without_changelog(
     repository: Path, monkeypatch: pytest.MonkeyPatch
@@ -117,7 +118,9 @@ def test_final_release_without_changelog(
     assert release.git(repository, "rev-parse", "HEAD") == head
     assert release.git(repository, "rev-parse", "v1.0.0^{}") == head
     assert not (repository / "CHANGELOG.md").exists()
-{% endif %}
+{%- endif %}
+{%- if pypi_publish and github_actions %}
+
 
 @pytest.mark.parametrize(
     ("tag", "expected_prerelease"), [("v1.0.0", False), ("v1.0.0rc1", True)]
@@ -134,6 +137,88 @@ def test_publish_resolves_only_remote_annotated_tags(
     commit, prerelease = publish.resolve(repository, tag)
     assert commit == release.git(repository, "rev-parse", "HEAD")
     assert prerelease is expected_prerelease
+{%- if changelog %}
+
+
+def test_publish_reads_final_release_notes(repository: Path) -> None:
+    (repository / "CHANGELOG.md").write_text(
+        "## {% if public_github %}[1.0.0]({{ repository_url }}/tree/v1.0.0){% else %}1.0.0{% endif %} - 2026-01-01\n\nA change.\n"
+    )
+    release.git(repository, "add", "CHANGELOG.md")
+    release.git(repository, "commit", "-qm", "Prepare release")
+    release.git(repository, "tag", "-a", "v1.0.0", "-m", "release")
+    assert "A change." in publish.notes(repository, "v1.0.0")
+{%- endif %}
+{%- endif %}
+{%- if pypi_publish and not github_actions %}
+
+
+@pytest.mark.parametrize(
+    ("tag", "test_index"), [("v1.0.0", False), ("v1.0.0rc1", True)]
+)
+def test_manual_publish_validates_before_upload(
+    monkeypatch: pytest.MonkeyPatch, tag: str, *, test_index: bool
+) -> None:
+    calls: list[object] = []
+    monkeypatch.setattr(
+        distributions,
+        "check",
+        lambda directory, value: calls.append((directory, value)),
+    )
+    monkeypatch.setattr(
+        distributions,
+        "inspect",
+        lambda *_args: (Path("dist/test.whl"), Path("dist/test.tar.gz")),
+    )
+    monkeypatch.setattr(
+        subprocess, "run", lambda command, **_kwargs: calls.append(command)
+    )
+    publish.publish(tag)
+    assert calls[0] == (Path("dist"), tag)
+    command = calls[1]
+    assert isinstance(command, list)
+    assert command[:2] == ["twine", "upload"]
+    assert ("testpypi" in command) is test_index
+    assert command[-2:] == ["dist/test.whl", "dist/test.tar.gz"]
+
+
+def test_manual_publish_stops_on_failed_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail(*_args: object) -> None:
+        raise ValueError("invalid artifacts")
+
+    monkeypatch.setattr(distributions, "check", fail)
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_args, **_kwargs: pytest.fail("unexpected upload")
+    )
+    with pytest.raises(ValueError, match="invalid artifacts"):
+        publish.publish("v1.0.0")
+{%- endif %}
+
+
+def test_release_supports_local_repository(repository: Path) -> None:
+    release.git(repository, "remote", "remove", "origin")
+    head, remote = release.state(repository)
+    assert head == release.git(repository, "rev-parse", "HEAD")
+    assert remote is None
+    release.check_available(repository, "v1.0.0")
+
+
+def test_prepare_local_release(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release.git(repository, "remote", "remove", "origin")
+    monkeypatch.setattr(release, "validate", lambda *_args: None)
+{% if changelog %}    monkeypatch.setattr(release, "notes", lambda *_args: None)
+{% endif %}    release.prepare(repository, "1.0.0rc1", dry_run=False)
+    assert release.git(repository, "cat-file", "-t", "refs/tags/v1.0.0rc1") == "tag"
+
+
+def test_release_rejects_broken_remote(repository: Path) -> None:
+    release.git(repository, "remote", "set-url", "origin", str(repository / "missing"))
+    with pytest.raises(subprocess.CalledProcessError):
+        release.state(repository)
 
 
 def test_distribution_inspection_checks_metadata_and_stale_files(
@@ -143,12 +228,18 @@ def test_distribution_inspection_checks_metadata_and_stale_files(
     root = f"{name}-1.0.0"
     content = (
         f"Metadata-Version: 2.4\nName: {distributions.NAME}\nVersion: 1.0.0\n"
-        "Requires-Python: >={{ minimum_python }}\nLicense-Expression: MIT\n\n"
+        "Requires-Python: >={{ minimum_python }}\n"
+{%- if license != 'none' %}
+        "License-Expression: {{ license }}\n"
+{%- endif %}
+        "\n"
     ).encode()
     wheel = tmp_path / f"{root}-py3-none-any.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr(f"{root}.dist-info/METADATA", content)
+{%- if license != 'none' %}
         archive.writestr(f"{root}.dist-info/licenses/LICENSE", "license")
+{%- endif %}
         archive.writestr(f"{distributions.WHEEL_PATH}/__init__.py", "")
         archive.writestr(f"{distributions.WHEEL_PATH}/py.typed", "")
     sdist = tmp_path / f"{root}.tar.gz"
@@ -157,7 +248,9 @@ def test_distribution_inspection_checks_metadata_and_stale_files(
             "PKG-INFO": content,
             "pyproject.toml": b"",
             "README.md": b"",
+{%- if license != 'none' %}
             "LICENSE": b"",
+{%- endif %}
             f"{distributions.SOURCE_PATH}/__init__.py": b"",
             f"{distributions.SOURCE_PATH}/py.typed": b"",
         }.items():
