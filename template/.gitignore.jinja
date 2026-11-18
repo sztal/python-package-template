@@ -13,6 +13,8 @@ __pycache__/
 {% endif %}
 
 # Python packaging
+*.egg-info/
+build/
 dist/
 
 # Testing
@@ -20,6 +22,11 @@ dist/
 .coverage.*
 .hypothesis/
 .pytest_cache/
+.testmondata
+.testmondata-*
+/coverage-data
+/coverage-data.*
+/coverage.json
 htmlcov/
 
 # Type checking

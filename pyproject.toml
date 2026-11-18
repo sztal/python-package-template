@@ -83,6 +83,9 @@ lint.per-file-ignores."extensions/**" = [
 lint.per-file-ignores."tests/**" = [
   "S101", # using assert is okay in tests
 ]
+lint.per-file-ignores."tests/test_template_tooling.py" = [
+  "PGH003",
+]
 lint.isort.required-imports = [
   "from __future__ import annotations",
 ]

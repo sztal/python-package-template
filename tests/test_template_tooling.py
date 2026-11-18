@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import py_compile
 import shutil
 import subprocess
@@ -17,6 +18,30 @@ import yaml
 MIN_COVERAGE = 90
 
 
+def assert_git_ignores(project: Path, ignored: list[str], allowed: list[str]) -> None:
+    """Check ignore rules independently of the user's Git configuration."""
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q", str(project)], check=True)  # noqa: S603
+    result = subprocess.run(  # noqa: S603
+        [
+            git,
+            "-C",
+            str(project),
+            "-c",
+            f"core.excludesFile={os.devnull}",
+            "check-ignore",
+            "--no-index",
+            "--stdin",
+        ],
+        input="\n".join([*ignored, *allowed]) + "\n",
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    assert result.stdout.splitlines() == ignored
+
+
 @pytest.fixture(scope="module")
 def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Copy the working template without Git so uncommitted changes are tested."""
@@ -26,6 +51,58 @@ def template_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for name in ("extensions", "licenses", "template"):
         shutil.copytree(project / name, source / name)
     return source
+
+
+def test_repository_ignores_tool_artifacts(tmp_path: Path) -> None:
+    """Keep local tox, test, and packaging output out of the repository."""
+    source = Path(__file__).resolve().parents[1]
+    shutil.copy(source / ".gitignore", tmp_path)
+    assert_git_ignores(
+        tmp_path,
+        [
+            ".tox/py/log",
+            ".testmondata",
+            ".testmondata-journal",
+            "build/temp",
+            "dist/package.whl",
+            "extensions/example.egg-info/PKG-INFO",
+        ],
+        ["uv.lock", "extensions/source.py"],
+    )
+
+
+@pytest.mark.parametrize("testmon", ["no", "manual", "automatic"])
+def test_generated_projects_ignore_tool_artifacts(
+    tmp_path: Path, template_source: Path, testmon: str
+) -> None:
+    """Ignore local artifacts regardless of the testmon configuration."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "pytest_testmon": testmon,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    assert_git_ignores(
+        project,
+        [
+            ".testmondata",
+            ".testmondata-journal",
+            "build/temp",
+            "dist/package.whl",
+            "src/example.egg-info/PKG-INFO",
+            "coverage-data",
+            "coverage-data.host.123",
+            "coverage.json",
+        ],
+        ["uv.lock", "pixi.lock", "coverage-data-source.py"],
+    )
 
 
 @pytest.fixture(
@@ -146,7 +223,7 @@ def test_rendered_tooling_is_complete(
         assert ("--no-testmon" in command.split()) is (testmon != "no")
     assert "twine>=6.1" in config["dependency-groups"]["release"]
     assert config["tool"]["coverage"]["report"]["fail_under"] == MIN_COVERAGE
-    if "docstrings" in data.get("doctest", []):
+    if "docstrings" in data.get("doctest", []):  # type: ignore
         source, _ = package_locations(data)
         assert source in config["tool"]["pytest"]["testpaths"]
         assert "." not in config["tool"]["pytest"]["testpaths"]
@@ -184,7 +261,7 @@ def test_generated_python_versions(
     )
     tests_job = checks_workflow["jobs"]["tests"]
     assert tests_job["strategy"]["matrix"]["python_version"] == python_versions
-    if "docs" in data.get("features", ["tasks", "docs"]):
+    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
         coverage_step = next(
             step
             for step in tests_job["steps"]
@@ -194,7 +271,7 @@ def test_generated_python_versions(
             coverage_step["if"]
             == f"${{{{ matrix.python_version == '{minimum_python}' }}}}"
         )
-    if "tasks" in data.get("features", ["tasks", "docs"]):
+    if "tasks" in data.get("features", ["tasks", "docs"]):  # type: ignore
         assert (
             f'# requires-python = ">={minimum_python}"'
             in (project / "noxfile.py").read_text()
@@ -237,7 +314,7 @@ def test_generated_branch_and_changelog(
         "towncrier>=25.8" in config["dependency-groups"]["release"]
     ) is has_changelog
     assert ("Changelog" in config["project"]["urls"]) is has_changelog
-    if "docs" in data.get("features", ["tasks", "docs"]):
+    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
         assert (project / "docs/changelog.md").exists() is has_changelog
     release_workflow = yaml.safe_load(
         (project / ".github/workflows/release.yaml").read_text()
@@ -375,7 +452,7 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
         f'IMPORT_NAME = "{import_name}"'
         in (project / "scripts/distributions.py").read_text()
     )
-    if "cli" in data.get("entry_points", []):
+    if "cli" in data.get("entry_points", []):  # type: ignore
         assert config["project"]["scripts"]["example-package"].startswith(
             f"{import_name}.cli:"
         )
@@ -383,7 +460,7 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
             f"from {import_name}.cli import "
             in (project / "tests/test_cli.py").read_text()
         )
-    if "docs" in data.get("features", ["tasks", "docs"]):
+    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
         assert f"::: {import_name}" in (project / "docs/reference/api.md").read_text()
 
 
@@ -762,7 +839,7 @@ def test_optional_integrations(
     actions = options.get("github_actions", public)
     publishing = options.get("pypi_publish", public)
     licensed = options.get("license", "MIT") != "none"
-    docs = "docs" in options.get("features", ["tasks", "docs"])
+    docs = "docs" in options.get("features", ["tasks", "docs"])  # type: ignore
     pixi = options.get("package_manager", "uv") == "pixi"
     mamba = options.get("package_manager", "uv") == "mamba"
     config = tomllib.loads((project / "pyproject.toml").read_text())
@@ -798,7 +875,7 @@ def test_optional_integrations(
             assert "pixi run" not in text
             assert "uv run" not in text
             assert "mamba.lock" not in text
-        if actions and "tasks" not in options.get("features", ["tasks", "docs"]):
+        if actions and "tasks" not in options.get("features", ["tasks", "docs"]):  # type: ignore
             workflow = (project / ".github/workflows/checks.yaml").read_text()
             assert '"python=$PYTHON_VERSION"' in workflow
     assert ("urls" in config["project"]) is public

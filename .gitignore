@@ -7,13 +7,21 @@ __pycache__/
 
 # Python environments
 .nox/
+.tox/
 .venv/
+
+# Python packaging
+*.egg-info/
+build/
+dist/
 
 # Testing
 .coverage
 .coverage.*
 .hypothesis/
 .pytest_cache/
+.testmondata
+.testmondata-*
 htmlcov/
 
 # Type checking
