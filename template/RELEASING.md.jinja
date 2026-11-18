@@ -3,8 +3,13 @@
 This project uses `{{ integration_branch }}` for integration and annotated Git tags for versions.
 Hatchling and `uv-dynamic-versioning` derive the package version from Git;
 do not manually edit a version field or use a version override for releases.
+{% if package_manager == 'mamba' -%}
+Commit `environment.yaml` before preparing a release. Project dependencies
+are installed with pip and are not locked.
+{%- else -%}
 Run `{{ 'uv lock' if package_manager == 'uv' else 'pixi install' }}` and commit
 `{{ package_manager }}.lock` before preparing a release.
+{%- endif %}
 
 ## Development and validation
 
@@ -14,7 +19,8 @@ commit messages and Git history relative to `{{ integration_branch }}` and add
 Towncrier fragments under `changelog.d/` describing its user-visible changes,
 using the categories configured in `pyproject.toml`. Do not add fragments for
 each change or commit, or for merges into other branches.
-{% endif %}
+
+{% endif -%}
 ```console
 make test
 make lint
@@ -37,7 +43,7 @@ match.
 {% if tasks == "nox" %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example
-`{{ 'uv run noxfile.py' if package_manager == 'uv' else 'pixi run --locked nox' }} -s tests-{{ minimum_python }} -- tests/test_version.py`.
+`{{ 'uv run noxfile.py' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name ~ ' nox' if package_manager == 'mamba' else 'pixi run --locked nox') }} -s tests-{{ minimum_python }} -- tests/test_version.py`.
 {% endif -%}
 {% if docs %}
 ## Documentation
@@ -59,7 +65,7 @@ the `github-pages` environment to deploy from `{{ integration_branch }}`.
 ## Prepare a release
 
 Use canonical `X.Y.Z` versions, optionally followed by `aN`, `bN`, or `rcN`.
-Start on clean `{{ integration_branch }}` with a committed lockfile. If an
+Start on clean `{{ integration_branch }}` with {% if package_manager == 'mamba' %}a committed `environment.yaml`{% else %}a committed lockfile{% endif %}. If an
 `origin` remote is configured, the branch must contain its integration branch.
 Versions must advance existing local tags and, when configured, remote tags.
 
@@ -67,11 +73,15 @@ Versions must advance existing local tags and, when configured, remote tags.
 {% if changelog -%}
 make release-notes VERSION=1.2.0
 {% endif -%}
-{{ 'uv run --group release' if package_manager == 'uv' else 'pixi run --locked' }} python -m scripts.release --dry-run 1.2.0
+{{ 'uv run --group release' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} python -m scripts.release --dry-run 1.2.0
 make release VERSION=1.2.0
 ```
 
 Preparation runs in an isolated clone and validates the tagged artifacts.
+{% if package_manager == 'mamba' -%}
+It creates a separate temporary Mamba environment for that clone and does not
+reinstall the clone into the named development environment.
+{% endif -%}
 The dry run leaves the caller's files and refs unchanged. {% if changelog %}A final release
 consumes pending fragments into the changelog; a prerelease keeps them.
 {% endif -%}

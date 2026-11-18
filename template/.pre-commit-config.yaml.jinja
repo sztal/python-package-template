@@ -26,7 +26,7 @@ repos:
     rev: 0.9.14
     hooks:
       - id: uv-lock
-{% else %}
+{% elif package_manager == 'pixi' %}
   - repo: local
     hooks:
       - id: pixi-lock

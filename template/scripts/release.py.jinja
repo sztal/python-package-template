@@ -16,6 +16,81 @@ from scripts.distributions import release_version
 
 INTEGRATION_BRANCH = "{{ integration_branch }}"
 
+{%- if package_manager == 'mamba' %}
+
+
+def mamba_run(prefix: Path | None = None) -> list[str]:
+    """Run a command in the selected or explicitly supplied Mamba environment."""
+    location = (
+        str(prefix) if prefix is not None else os.environ.get("MAMBA_PROJECT_PREFIX")
+    )
+    if location:
+        return ["mamba", "run", "--prefix", location]
+    return ["mamba", "run", "--name", "{{ mamba_environment_name }}"]
+
+
+def prepare_environment(directory: Path, prefix: Path) -> None:
+    """Install the cloned project into an independent Mamba environment."""
+    subprocess.run(
+        [
+            "mamba",
+            "create",
+            "--yes",
+            "--prefix",
+            str(prefix),
+            "--file",
+            "environment.yaml",
+        ],
+        cwd=directory,
+        check=True,
+    )
+    subprocess.run(
+        [
+            *mamba_run(prefix),
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "--editable",
+            ".",
+            "--group",
+            "dev",
+{%- if docs %}
+            "--group",
+            "docs",
+{%- endif %}
+        ],
+        cwd=directory,
+        check=True,
+    )
+
+
+def refresh_project(directory: Path, prefix: Path) -> None:
+    """Refresh installed metadata after the release tag is created."""
+    subprocess.run(
+        [
+            *mamba_run(prefix),
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--editable",
+            ".",
+        ],
+        cwd=directory,
+        check=True,
+    )
+
+
+def remove_environment(prefix: Path) -> None:
+    """Remove the temporary release environment."""
+    subprocess.run(
+        ["mamba", "env", "remove", "--yes", "--prefix", str(prefix)], check=True
+    )
+
+{%- endif %}
+
 
 def git(directory: Path, *args: str) -> str:
     """Run Git and return its output."""
@@ -55,7 +130,7 @@ def state(directory: Path) -> tuple[str, str | None]:
                 f"Local {INTEGRATION_BRANCH} does not contain origin/{INTEGRATION_BRANCH}; "
                 "fetch and reconcile it"
             )
-    git(directory, "ls-files", "--error-unmatch", "{{ package_manager }}.lock")
+    git(directory, "ls-files", "--error-unmatch", "{{ 'environment.yaml' if package_manager == 'mamba' else package_manager ~ '.lock' }}")
     return head, remote
 
 
@@ -79,16 +154,20 @@ def check_available(directory: Path, tag: str) -> None:
             raise ValueError(f"Release must be newer than {existing}")
 {% if changelog %}
 
-def notes(directory: Path, version: str) -> None:
+def notes(directory: Path, version: str{% if package_manager == 'mamba' %}, prefix: Path | None = None{% endif %}) -> None:
     """Preview Towncrier notes without changing files."""
     subprocess.run(
         [
+{%- if package_manager == 'mamba' %}
+            *mamba_run(prefix),
+{%- else %}
             "{{ package_manager }}",
             "run",
             "--locked",
 {%- if package_manager == 'uv' %}
             "--group",
             "release",
+{%- endif %}
 {%- endif %}
             "towncrier",
             "build",
@@ -101,10 +180,13 @@ def notes(directory: Path, version: str) -> None:
     )
 {% endif %}
 
-def validate(directory: Path, tag: str) -> None:
+def validate(directory: Path, tag: str{% if package_manager == 'mamba' %}, prefix: Path{% endif %}) -> None:
     """Run all checks against the tagged checkout."""
     env = os.environ.copy()
     env["TAG"] = tag
+{%- if package_manager == 'mamba' %}
+    env["MAMBA_PROJECT_PREFIX"] = str(prefix)
+{%- endif %}
     subprocess.run(["make", "check"], cwd=directory, env=env, check=True)
 
 
@@ -131,18 +213,26 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         git(checkout, "checkout", "--detach", head)
         for key in ("user.name", "user.email"):
             git(checkout, "config", key, git(directory, "config", "--get", key))
+{%- if package_manager == 'mamba' %}
+        prefix = temporary / "environment"
+        prepare_environment(checkout, prefix)
+{%- endif %}
 {% if changelog %}
         if release_version(tag).is_prerelease:
-            notes(checkout, version)
+            notes(checkout, version{% if package_manager == 'mamba' %}, prefix{% endif %})
         else:
             subprocess.run(
                 [
+{%- if package_manager == 'mamba' %}
+                    *mamba_run(prefix),
+{%- else %}
                     "{{ package_manager }}",
                     "run",
                     "--locked",
 {%- if package_manager == 'uv' %}
                     "--group",
                     "release",
+{%- endif %}
 {%- endif %}
                     "towncrier",
                     "build",
@@ -157,7 +247,10 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
             git(checkout, "commit", "-m", f"Prepare release {version}")
 {% endif %}
         git(checkout, "tag", "--annotate", tag, "--message", f"Release {version}")
-        validate(checkout, tag)
+{%- if package_manager == 'mamba' %}
+        refresh_project(checkout, prefix)
+{%- endif %}
+        validate(checkout, tag{% if package_manager == 'mamba' %}, prefix{% endif %})
         clean(checkout)
         if state(directory) != (head, remote):
             raise RuntimeError(
@@ -191,6 +284,9 @@ def prepare(directory: Path, version: str, *, dry_run: bool) -> None:
         print(f"Release preparation failed; inspect {checkout}", file=sys.stderr)
         raise
     else:
+{%- if package_manager == 'mamba' %}
+        remove_environment(prefix)
+{%- endif %}
         shutil.rmtree(temporary)
     if dry_run:
         print("Release rehearsal passed; caller files and refs are unchanged")

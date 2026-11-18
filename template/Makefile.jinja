@@ -13,7 +13,15 @@
 {% endif %}
 
 export VERSION TAG
+{% if package_manager == 'mamba' %}
+ifeq ($(MAMBA_PROJECT_PREFIX),)
+RUN = mamba run --name {{ mamba_environment_name }}
+else
+RUN = mamba run --prefix "$(MAMBA_PROJECT_PREFIX)"
+endif
+{% else %}
 RUN = {{ 'uv run' if package_manager == 'uv' else 'pixi run --locked' }}
+{% endif %}
 
 help:
 	@echo "Usage: make <target>"
@@ -75,6 +83,8 @@ wheel:
 install:
 {% if package_manager == 'uv' %}
 	uv sync --group dev
+{% elif package_manager == 'mamba' %}
+	$(RUN) python -m pip install --editable . --group dev{% if docs %} --group docs{% endif %}
 {% else %}
 	pixi install
 {% endif %}

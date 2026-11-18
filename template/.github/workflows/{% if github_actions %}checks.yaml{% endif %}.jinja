@@ -22,7 +22,18 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - run: make lint
       - run: git diff --exit-code
 
@@ -34,7 +45,18 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - run: make typecheck
 {% if docs %}
       - run: make docs
@@ -49,7 +71,18 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - run: make build check-dist
         env:
           TAG: {% raw %}${{ inputs.tag }}{% endraw %}
@@ -73,9 +106,20 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
 {% if tasks == "nox" %}
-      - run: {% if package_manager == 'uv' %}uv run noxfile.py{% else %}pixi run --locked nox{% endif %} -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
+      - run: {% if package_manager == 'uv' %}uv run noxfile.py{% elif package_manager == 'mamba' %}mamba run --name {{ mamba_environment_name }} nox{% else %}pixi run --locked nox{% endif %} -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
         env:
           COVERAGE_FILE: coverage-data
           PYTEST_XDIST_AUTO_NUM_WORKERS: '2'
@@ -86,6 +130,18 @@ jobs:
           uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage combine
           uv run --locked --python {% raw %}${{ matrix.python_version }}{% endraw %} coverage report
         env:
+          COVERAGE_FILE: coverage-data
+{% elif package_manager == 'mamba' %}
+      - run: |
+          prefix="$RUNNER_TEMP/python-$PYTHON_VERSION"
+          mamba create --yes --prefix "$prefix" --override-channels --channel conda-forge "python=$PYTHON_VERSION" 'pip>=25.1'
+          mamba run --prefix "$prefix" python -m pip install . --group test
+          mamba run --prefix "$prefix" coverage erase
+          mamba run --prefix "$prefix" coverage run -m pytest -n 2
+          mamba run --prefix "$prefix" coverage combine
+          mamba run --prefix "$prefix" coverage report
+        env:
+          PYTHON_VERSION: {% raw %}${{ matrix.python_version }}{% endraw %}
           COVERAGE_FILE: coverage-data
 {% else %}
       - run: |

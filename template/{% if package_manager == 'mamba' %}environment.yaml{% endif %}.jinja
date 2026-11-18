@@ -1,0 +1,7 @@
+---
+name: {{ mamba_environment_name | tojson }}
+channels:
+  - conda-forge
+dependencies:
+  - python=3.{{ target_python[3:] }}
+  - pip>=25.1

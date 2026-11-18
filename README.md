@@ -76,8 +76,13 @@ values. Important choices include:
   overridden independently. Without Actions, publishing uses Twine locally.
 - `license`: select an open-source license (default: MIT) or no license;
   no license does not prevent publishing or make a project private
-- `package_manager`: choose uv (default) or Pixi. Pixi uses locked environments
-  for Nox; update its lockfile explicitly to change dependencies.
+- `package_manager`: choose uv (default), Pixi, or Mamba. Pixi uses locked
+  environments for Nox; update its lockfile explicitly to change dependencies.
+  Mamba creates a named Python environment and uses pip to install project
+  dependencies from `pyproject.toml` without a lockfile.
+- `mamba_environment_name`: when Mamba is selected, the environment name
+  defaults to the distribution name. Create the environment explicitly from
+  `environment.yaml` before installing project dependencies.
 - `changelog`: enable changelog and Towncrier support (default: enabled);
   fragments are written at integration-branch merge time from the incoming
   branch's Git history and assembled for releases
@@ -133,7 +138,8 @@ disabling changelog support, as project-specific files may be preserved.
 Review the update diff when disabling public GitHub, Actions, publishing, or
 a license: Copier can preserve locally modified files. Existing projects keep
 their saved answers; review the selected manager and regenerate its lockfile
-if switching between uv and Pixi.
+if switching between managers. Mamba uses no dependency lockfile; review any
+previously generated or locally maintained lockfiles separately.
 
 For projects generated with the former `package_layout: namespace` option,
 Copier defaults to a flat namespace package on update. This corrects the

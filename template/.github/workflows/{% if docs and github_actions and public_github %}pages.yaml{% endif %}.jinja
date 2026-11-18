@@ -29,7 +29,18 @@ jobs:
         with:
           fetch-depth: 0
           ref: {% raw %}${{ inputs.ref }}{% endraw %}
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - uses: actions/download-artifact@v5
         with:
           name: coverage-data
@@ -38,10 +49,10 @@ jobs:
 {% if package_manager == 'uv' %}
           uv sync --locked --group docs --group test
 {% endif %}
-          {{ 'uv run --no-sync' if package_manager == 'uv' else 'pixi run --locked' }} coverage json --data-file=coverage-data -o coverage.json
-          {{ 'uv run --no-sync' if package_manager == 'uv' else 'pixi run --locked' }} zensical build --clean --strict
-          {{ 'uv run --no-sync' if package_manager == 'uv' else 'pixi run --locked' }} coverage html --data-file=coverage-data -d site/coverage
-          {{ 'uv run --no-sync' if package_manager == 'uv' else 'pixi run --locked' }} python -m scripts.coverage_badge coverage.json site/coverage.svg
+          {{ 'uv run --no-sync' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} coverage json --data-file=coverage-data -o coverage.json
+          {{ 'uv run --no-sync' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} zensical build --clean --strict
+          {{ 'uv run --no-sync' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} coverage html --data-file=coverage-data -d site/coverage
+          {{ 'uv run --no-sync' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} python -m scripts.coverage_badge coverage.json site/coverage.svg
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

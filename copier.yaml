@@ -89,6 +89,22 @@ package_manager:
   choices:
     uv: uv
     Pixi: pixi
+    Mamba: mamba
+
+mamba_environment_name:
+  type: str
+  help: What is the Mamba environment name?
+  default: "{{ distribution_name }}"
+  when: "{{ package_manager == 'mamba' }}"
+  validator: >-
+    {% set allowed = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._' %}
+    {% set first = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' %}
+    {% if not mamba_environment_name
+       or mamba_environment_name[0] not in first
+       or mamba_environment_name | select('in', allowed) | list | length != mamba_environment_name | length
+       or mamba_environment_name | lower == 'base' %}
+    Enter a non-reserved environment name using letters, numbers, hyphens, underscores, and dots, starting with a letter or number.
+    {% endif %}
 
 integration_branch:
   type: str

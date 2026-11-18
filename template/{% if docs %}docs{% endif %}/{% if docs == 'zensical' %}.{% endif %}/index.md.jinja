@@ -44,6 +44,8 @@ uvx {{ distribution_name }}
 ```
 {% elif package_manager == 'pixi' -%}
 Run `pixi run {{ distribution_name }}` from the project.
+{% elif package_manager == 'mamba' -%}
+Run `mamba run --name {{ mamba_environment_name }} {{ distribution_name }}` from the project.
 {% else -%}
 After installing the package, run `{{ distribution_name }}`.
 {% endif -%}

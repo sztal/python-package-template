@@ -36,7 +36,18 @@ jobs:
         with:
           ref: '{{ integration_branch }}'
           fetch-depth: 0
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - name: Validate the release tag
         id: tag
         env:
@@ -50,7 +61,7 @@ jobs:
           else
             export TAG="${REF#refs/tags/}"
           fi
-          {% if package_manager == 'uv' %}uv run --locked --group release{% else %}pixi run --locked{% endif %} python -m scripts.publish --resolve
+          {% if package_manager == 'uv' %}uv run --locked --group release{% elif package_manager == 'mamba' %}mamba run --name {{ mamba_environment_name }}{% else %}pixi run --locked{% endif %} python -m scripts.publish --resolve
 
   validation:
     needs: resolve
@@ -115,7 +126,18 @@ jobs:
         with:
           ref: {% raw %}${{ needs.resolve.outputs.commit }}{% endraw %}
           fetch-depth: 0
+{% if package_manager == 'mamba' %}
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          mamba-version: '*'
+          activate-environment: {{ mamba_environment_name | tojson }}
+          environment-file: environment.yaml
+          auto-activate: false
+      - run: make install
+{% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
+{% endif %}
       - name: Create the GitHub release
         env:
           TAG: {% raw %}${{ needs.resolve.outputs.tag }}{% endraw %}
@@ -125,7 +147,7 @@ jobs:
           args=()
           if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
 {% if changelog %}
-          {% if package_manager == 'uv' %}uv run --locked --group release{% else %}pixi run --locked{% endif %} python -m scripts.publish --notes-file "$RUNNER_TEMP/release-notes.md"
+          {% if package_manager == 'uv' %}uv run --locked --group release{% elif package_manager == 'mamba' %}mamba run --name {{ mamba_environment_name }}{% else %}pixi run --locked{% endif %} python -m scripts.publish --notes-file "$RUNNER_TEMP/release-notes.md"
           gh release create "$TAG" --verify-tag --notes-file "$RUNNER_TEMP/release-notes.md" "${args[@]}"
 {%- else %}
           gh release create "$TAG" --verify-tag --generate-notes "${args[@]}"

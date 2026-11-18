@@ -56,15 +56,34 @@ uv lock
 uv sync --group dev{% if docs %} --group docs{% endif %}
 ```
 
-{% else -%}
+{% elif package_manager == 'pixi' -%}
 Install [Pixi](https://pixi.prefix.dev/) and set up the development environment:
 
 ```bash
 pixi install
 ```
 
+{% else -%}
+Install [Mamba](https://mamba.readthedocs.io/) and create the named environment
+once, then install this project and its development dependencies with pip:
+
+```bash
+mamba create --file environment.yaml
+make install
+```
+
+The environment name is `{{ mamba_environment_name }}`. If it already exists,
+inspect it before installing dependencies; choose a different name rather than
+replacing an unrelated environment. `environment.yaml` specifies Python and
+pip, while `pyproject.toml` defines Python dependencies. They are not locked,
+so future installs can resolve different versions.
+
 {% endif -%}
+{% if package_manager != 'mamba' -%}
 Commit `{{ package_manager }}.lock` with the project. Run the test suite and checks with:
+{%- else -%}
+Commit `environment.yaml` with the project. Run the test suite and checks with:
+{%- endif %}
 
 ```bash
 make test
@@ -75,7 +94,7 @@ make check-dist
 ```
 {% if tasks == "nox" %}
 Use `make nox` for the supported-Python test matrix and
-`{{ 'uv run noxfile.py' if package_manager == 'uv' else 'pixi run --locked nox' }} -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
+`{{ 'uv run noxfile.py' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name ~ ' nox' if package_manager == 'mamba' else 'pixi run --locked nox') }} -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
 {% endif -%}
 {% if docs %}
 Use `make docs` for a strict documentation build and `make docs-serve` for
@@ -100,6 +119,8 @@ Run the command from the project environment:
 ```
 pixi run {{ distribution_name }}
 ```
+{% elif package_manager == 'mamba' -%}
+Run `mamba run --name {{ mamba_environment_name }} {{ distribution_name }}` from the project.
 {% else -%}
 After installing the package, run `{{ distribution_name }}`.
 {% endif -%}

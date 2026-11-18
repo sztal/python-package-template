@@ -23,7 +23,12 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     release.git(project, "init", "-q", "--initial-branch={{ integration_branch }}")
     release.git(project, "config", "user.name", "Release Test")
     release.git(project, "config", "user.email", "release@example.invalid")
-    (project / "{{ package_manager }}.lock").write_text("lock\n")
+    (project / "{{ 'environment.yaml' if package_manager == 'mamba' else package_manager ~ '.lock' }}").write_text("test\n")
+{% if package_manager == 'mamba' %}
+    monkeypatch.setattr(release, "prepare_environment", lambda *_args: None)
+    monkeypatch.setattr(release, "refresh_project", lambda *_args: None)
+    monkeypatch.setattr(release, "remove_environment", lambda *_args: None)
+{% endif %}
     (project / "tracked.txt").write_text("initial\n")
 {% if changelog %}
     (project / "CHANGELOG.md").write_text("# Changelog\n")
@@ -95,8 +100,11 @@ def test_release_rehearsal_preserves_caller(
     head = release.git(repository, "rev-parse", "HEAD")
     checked: list[str] = []
 
-    def validate(directory: Path, tag: str) -> None:
+    def validate(directory: Path, tag: str{% if package_manager == 'mamba' %}, prefix: Path{% endif %}) -> None:
         assert release.git(directory, "cat-file", "-t", f"refs/tags/{tag}") == "tag"
+{% if package_manager == 'mamba' %}
+        assert prefix == directory.parent / "environment"
+{% endif %}
         checked.append(tag)
 
 {% if changelog %}    monkeypatch.setattr(release, "notes", lambda *_args: None)
@@ -106,6 +114,93 @@ def test_release_rehearsal_preserves_caller(
     assert release.git(repository, "rev-parse", "HEAD") == head
     assert not release.git(repository, "tag", "--list")
     assert not release.git(repository, "status", "--porcelain")
+{%- if package_manager == 'mamba' %}
+
+
+def test_release_creates_a_separate_environment_for_the_clone(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prepared: list[tuple[Path, Path]] = []
+    refreshed: list[tuple[Path, Path]] = []
+
+    def refresh(directory: Path, prefix: Path) -> None:
+        assert release.git(directory, "cat-file", "-t", "refs/tags/v1.0.0rc1") == "tag"
+        refreshed.append((directory, prefix))
+
+    monkeypatch.setattr(
+        release,
+        "prepare_environment",
+        lambda directory, prefix: prepared.append((directory, prefix)),
+    )
+    monkeypatch.setattr(release, "refresh_project", refresh)
+    monkeypatch.setattr(release, "validate", lambda *_args: None)
+{% if changelog %}    monkeypatch.setattr(release, "notes", lambda *_args: None)
+{% endif %}    release.prepare(repository, "1.0.0rc1", dry_run=True)
+    checkout, prefix = prepared[0]
+    assert checkout != repository
+    assert prefix == checkout.parent / "environment"
+    assert refreshed == prepared
+
+
+def test_release_environment_installs_the_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "checkout"
+    prefix = tmp_path / "environment"
+    calls: list[tuple[list[str], Path]] = []
+
+    def run(command: list[str], *, cwd: Path, check: bool) -> None:
+        assert check
+        calls.append((command, cwd))
+
+    monkeypatch.setattr(subprocess, "run", run)
+    release.prepare_environment(checkout, prefix)
+    release.refresh_project(checkout, prefix)
+    create, install, refresh = calls
+    assert create[1] == checkout
+    assert create[0][:5] == ["mamba", "create", "--yes", "--prefix", str(prefix)]
+    assert install[1] == checkout
+    assert install[0][:4] == ["mamba", "run", "--prefix", str(prefix)]
+    assert install[0][4:9] == ["python", "-m", "pip", "install", "--editable"]
+    assert "." in install[0]
+    assert "dev" in install[0]
+    assert refresh == (
+        [
+            "mamba",
+            "run",
+            "--prefix",
+            str(prefix),
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--editable",
+            ".",
+        ],
+        checkout,
+    )
+
+
+def test_release_validation_uses_the_clone_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "checkout"
+    prefix = tmp_path / "environment"
+    calls: list[tuple[list[str], Path, dict[str, str]]] = []
+
+    def run(command: list[str], *, cwd: Path, env: dict[str, str], check: bool) -> None:
+        assert check
+        calls.append((command, cwd, env))
+
+    monkeypatch.setattr(subprocess, "run", run)
+    release.validate(checkout, "v1.0.0", prefix)
+    command, directory, env = calls[0]
+    assert command == ["make", "check"]
+    assert directory == checkout
+    assert env["TAG"] == "v1.0.0"
+    assert env["MAMBA_PROJECT_PREFIX"] == str(prefix)
+{%- endif %}
 {%- if not changelog %}
 
 

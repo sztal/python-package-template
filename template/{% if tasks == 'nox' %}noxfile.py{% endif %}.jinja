@@ -1,3 +1,4 @@
+{% if package_manager in ['uv', 'mamba'] -%}
 {% if package_manager == 'uv' -%}
 # /// script
 # requires-python = ">={{ minimum_python }}"
@@ -6,6 +7,7 @@
 #   "uv>=0.8.6",
 # ]
 # ///
+{% endif -%}
 """Task automation with Nox."""
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from pathlib import Path
 import nox
 
 nox.needs_version = ">=2025.2.9"
-nox.options.default_venv_backend = "uv"
+nox.options.default_venv_backend = "{{ 'uv' if package_manager == 'uv' else 'mamba' }}"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.sessions = (
     "lint",
@@ -31,12 +33,21 @@ PYPROJECT = nox.project.load_toml()
 PROJECT_NAME = PYPROJECT["project"]["name"]
 SUPPORTED_PYTHON_VERSIONS = nox.project.python_versions(PYPROJECT)
 DEFAULT_PYTHON_VERSION = Path(".python-version").read_text().rstrip()
+{%- if package_manager == 'mamba' %}
+MAMBA_OPTIONS = ["--override-channels", "--channel=conda-forge", "pip>=25.1"]
+{%- endif %}
 
 
+{% if package_manager == 'mamba' -%}
+@nox.session(
+    python=SUPPORTED_PYTHON_VERSIONS, tags=["tests"], venv_params=MAMBA_OPTIONS
+)
+{% else -%}
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, tags=["tests"])
+{% endif -%}
 def tests(session: nox.Session) -> None:
     """Run the test suite."""
-{%- if install == 'uv pip' %}
+{%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install(".", "--group", "test")
 {%- else %}
     uv_sync(
@@ -72,10 +83,10 @@ def tests(session: nox.Session) -> None:
     session.run("coverage", "report")
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"])
+@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"]{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
 def lint(session: nox.Session) -> None:
     """Run pre-commit linting."""
-{%- if install == 'uv pip' %}
+{%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install("--group", "lint")
 {%- else %}
     uv_sync("--group", "lint", session=session)
@@ -85,14 +96,16 @@ def lint(session: nox.Session) -> None:
         "run",
         "--all-files",
         *session.posargs,
+{%- if package_manager == 'uv' %}
         env={"FORCE_PRE_COMMIT_UV_PATCH": "1"},
+{%- endif %}
     )
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"])
+@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"]{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
 def typecheck(session: nox.Session) -> None:
     """Typecheck Python code."""
-{%- if install == 'uv pip' %}
+{%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install(".", "--group", "type")
 {%- else %}
     uv_sync(
@@ -113,10 +126,10 @@ def typecheck(session: nox.Session) -> None:
     session.run("mypy", *(session.posargs or paths))
 
 {% if docs %}
-@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"])
+@nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"]{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
 def docs(session: nox.Session) -> None:
     """Build the documentation."""
-{%- if install == 'uv pip' %}
+{%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install("-e", ".", "--group", "docs")
 {%- else %}
     uv_sync("--group", "docs", session=session)
@@ -130,10 +143,10 @@ def docs(session: nox.Session) -> None:
     )
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
+@nox.session(python=DEFAULT_PYTHON_VERSION{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
 def autodocs(session: nox.Session) -> None:
     """Serve the documentation locally."""
-{%- if install == 'uv pip' %}
+{%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install("-e", ".", "--group", "docs")
 {%- else %}
     uv_sync("--group", "docs", session=session)
@@ -145,7 +158,7 @@ def autodocs(session: nox.Session) -> None:
         *session.posargs,
     )
 
-{% endif %}{% if install == 'uv sync' %}
+{% endif %}{% if package_manager == 'uv' and install == 'uv sync' %}
 def uv_sync(*args: str, session: nox.Session) -> None:
     """Run ``uv sync`` to install dependencies."""
     session.run_install(

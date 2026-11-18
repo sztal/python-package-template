@@ -35,7 +35,7 @@ destination and version. Do not infer the version from commit messages.
 Only perform the authorized release stage. Read `RELEASING.md` for the
 generated workflow. {% if changelog %}`make release-notes VERSION=1.2.0` previews notes;
 {% endif -%}
-`{{ 'uv run --group release' if package_manager == 'uv' else 'pixi run --locked' }} python -m scripts.release --dry-run 1.2.0` rehearses
+`{{ 'uv run --group release' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name if package_manager == 'mamba' else 'pixi run --locked') }} python -m scripts.release --dry-run 1.2.0` rehearses
 in an isolated clone. `make release VERSION=1.2.0` prepares a validated
 commit and annotated tag locally without pushing or publishing.
 

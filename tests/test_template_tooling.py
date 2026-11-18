@@ -625,6 +625,17 @@ def test_legacy_namespace_answers_migrate_on_recopy(
             "features": [],
         },
         {"package_manager": "pixi", "features": ["docs"]},
+        {"package_manager": "mamba", "mamba_environment_name": "example-dev"},
+        {
+            "package_manager": "mamba",
+            "target_python": "py313",
+            "public_github": False,
+            "pypi_publish": True,
+            "license": "none",
+            "changelog": False,
+            "features": [],
+        },
+        {"package_manager": "mamba", "features": ["docs"]},
     ],
 )
 def test_optional_integrations(
@@ -653,6 +664,7 @@ def test_optional_integrations(
     licensed = options.get("license", "MIT") != "none"
     docs = "docs" in options.get("features", ["tasks", "docs"])
     pixi = options.get("package_manager", "uv") == "pixi"
+    mamba = options.get("package_manager", "uv") == "mamba"
     config = tomllib.loads((project / "pyproject.toml").read_text())
     assert (project / "LICENSE").exists() is licensed
     assert ("license" in config["project"]) is licensed
@@ -666,6 +678,29 @@ def test_optional_integrations(
     assert (project / "scripts/publish.py").exists() is publishing
     assert (project / "docs/license.md").exists() is (docs and licensed)
     assert ("pixi" in config["tool"]) is pixi
+    assert (project / "environment.yaml").exists() is mamba
+    if mamba:
+        environment = yaml.safe_load((project / "environment.yaml").read_text())
+        assert environment == {
+            "name": options.get("mamba_environment_name", "example-package"),
+            "channels": ["conda-forge"],
+            "dependencies": [
+                f"python=3.{str(options.get('target_python', 'py315'))[3:]}",
+                "pip>=25.1",
+            ],
+        }
+        for path in [
+            project / "Makefile",
+            project / ".pre-commit-config.yaml",
+            project / "scripts/release.py",
+        ]:
+            text = path.read_text()
+            assert "pixi run" not in text
+            assert "uv run" not in text
+            assert "mamba.lock" not in text
+        if actions and "tasks" not in options.get("features", ["tasks", "docs"]):
+            workflow = (project / ".github/workflows/checks.yaml").read_text()
+            assert '"python=$PYTHON_VERSION"' in workflow
     assert ("urls" in config["project"]) is public
     if not public:
         for path in (project / "README.md", project / "pyproject.toml"):
@@ -689,6 +724,29 @@ def test_optional_integrations(
         capture_output=True,
         text=True,
     )
+
+
+@pytest.mark.parametrize(
+    "name", ["", "base", "BASE", "-bad", "../bad", "bad/name", "bad name", "bad;name"]
+)
+def test_invalid_mamba_environment_name_is_rejected(
+    tmp_path: Path, template_source: Path, name: str
+) -> None:
+    """Reject names that could target the base environment or escape commands."""
+    with pytest.raises(ValueError, match="non-reserved environment name"):
+        copier.run_copy(
+            str(template_source),
+            tmp_path / "project",
+            data={
+                "project_name": "example-package",
+                "project_description": "Example package",
+                "package_manager": "mamba",
+                "mamba_environment_name": name,
+            },
+            defaults=True,
+            unsafe=True,
+            quiet=True,
+        )
 
 
 def test_recopy_disables_public_integrations(
@@ -722,4 +780,36 @@ def test_recopy_disables_public_integrations(
     assert answers["pypi_publish"] is False
     assert (
         "github.com/example/example-package" not in (project / "README.md").read_text()
+    )
+
+
+def test_recopy_can_switch_to_mamba(tmp_path: Path, template_source: Path) -> None:
+    """Keep existing project answers when adding a named Mamba environment."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "github_user": "example",
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    copier.run_recopy(
+        project,
+        data={"package_manager": "mamba", "mamba_environment_name": "example-dev"},
+        defaults=True,
+        overwrite=True,
+        unsafe=True,
+        quiet=True,
+    )
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text())
+    assert answers["project_name"] == "example-package"
+    assert answers["package_manager"] == "mamba"
+    assert answers["mamba_environment_name"] == "example-dev"
+    assert yaml.safe_load((project / "environment.yaml").read_text())["name"] == (
+        "example-dev"
     )

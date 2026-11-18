@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 
 from scripts.distributions import release_version
-from scripts.release import INTEGRATION_BRANCH, git
+from scripts.release import INTEGRATION_BRANCH, git{% if package_manager == 'mamba' %}, mamba_run{% endif %}
 
 
 def resolve(directory: Path, tag: str) -> tuple[str, bool]:
@@ -51,12 +51,16 @@ def notes(directory: Path, tag: str) -> str:
     if version.is_prerelease:
         return subprocess.check_output(
             [
+{%- if package_manager == 'mamba' %}
+                *mamba_run(),
+{%- else %}
                 "{{ package_manager }}",
                 "run",
                 "--locked",
 {%- if package_manager == 'uv' %}
                 "--group",
                 "release",
+{%- endif %}
 {%- endif %}
                 "towncrier",
                 "build",

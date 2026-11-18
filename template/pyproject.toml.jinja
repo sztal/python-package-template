@@ -102,11 +102,11 @@ lint = [
   "ruff==0.16.4",
 ]
 release = [
-{%- if package_manager == 'pixi' %}
+{%- if package_manager in ['pixi', 'mamba'] %}
   "build>=1.6",
 {%- endif %}
   "packaging>=24.2",
-{%- if package_manager == 'pixi' %}
+{%- if package_manager in ['pixi', 'mamba'] %}
   "pip>=24",
 {%- endif %}
 {%- if changelog %}
@@ -266,8 +266,7 @@ report.skip_covered = true
 report.show_missing = true
 html.show_contexts = true
 html.skip_covered = false
-
-{% if changelog -%}
+{% if changelog %}
 [tool.towncrier]
 name = "{{ project_name }}"
 directory = "changelog.d"

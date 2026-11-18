@@ -16,6 +16,12 @@
 Read and follow [STYLE.md](STYLE.md) before changing Python code or tests.
 `pyproject.toml` is the source of truth for dependency groups, Ruff, mypy,
 pytest, and coverage configuration.
+{%- if package_manager == 'mamba' %}
+
+Create the `{{ mamba_environment_name }}` Mamba environment explicitly from
+`environment.yaml` before running `make install`. Python dependencies are
+installed with pip from `pyproject.toml` and are not locked.
+{%- endif %}
 
 Keep changes focused, preserve public behavior unless the task intentionally
 changes it, and add or update tests for behavior changes.
