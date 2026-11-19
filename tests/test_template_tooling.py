@@ -187,6 +187,7 @@ def test_rendered_tooling_is_complete(
     assert (project / "docs").exists() is has_docs
     assert (project / ".github/workflows/pages.yaml").exists() is has_docs
     assert (project / "scripts/coverage_badge.py").exists() is has_docs
+    assert (project / ".github/skills/update-readme/SKILL.md").is_file()
     for path in (project / ".github/workflows").glob("*.yaml"):
         contents = path.read_text()
         assert contents.endswith("\n")
