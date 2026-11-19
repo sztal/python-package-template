@@ -48,7 +48,7 @@ def mypy_paths() -> list[str]:
     _, _, source_only = settings()
     paths = [{{ package_path | tojson }}]
     if not source_only:
-        paths.extend(["tests", "scripts"{% if tasks == "nox" %}, "noxfile.py"{% endif %}])
+        paths.extend(["tests", "scripts"{% if nox %}, "noxfile.py"{% endif %}])
     return paths
 
 

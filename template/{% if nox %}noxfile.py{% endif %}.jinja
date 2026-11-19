@@ -8,7 +8,7 @@
 # ]
 # ///
 {% endif -%}
-"""Task automation with Nox."""
+"""Development checks with Nox."""
 
 from __future__ import annotations
 
@@ -175,7 +175,7 @@ def uv_sync(*args: str, session: nox.Session) -> None:
 if __name__ == "__main__":
     nox.main()
 {%- else -%}
-"""Task automation using locked Pixi environments."""
+"""Development checks using locked Pixi environments."""
 
 from __future__ import annotations
 

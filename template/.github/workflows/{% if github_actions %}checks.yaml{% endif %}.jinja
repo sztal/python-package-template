@@ -118,7 +118,7 @@ jobs:
 {% else %}
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
 {% endif %}
-{% if tasks == "nox" %}
+{% if nox %}
       - run: {% if package_manager == 'uv' %}uv run noxfile.py{% elif package_manager == 'mamba' %}mamba run --name {{ mamba_environment_name }} nox{% else %}pixi run --locked nox{% endif %} -s {% raw %}tests-${{ matrix.python_version }}{% endraw %}
         env:
           COVERAGE_FILE: coverage-data

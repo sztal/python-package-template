@@ -58,7 +58,7 @@ make test
 ```
 Type-checking level and merge/release policy are configured in
 `[tool.project-checks]` in `pyproject.toml`.
-{% if tasks == "nox" %}
+{% if nox %}
 Use `make nox` for the supported-Python matrix.
 {% endif %}
 {%- if docs %}

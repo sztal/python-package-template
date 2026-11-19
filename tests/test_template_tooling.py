@@ -109,7 +109,12 @@ def test_generated_projects_ignore_tool_artifacts(
 @pytest.fixture(
     params=[
         {},
-        {"package_layout": "src", "features": [], "target_python": "py313"},
+        {
+            "package_layout": "src",
+            "features": [],
+            "nox": False,
+            "target_python": "py313",
+        },
         {"minimum_python": "3.14", "target_python": "py314"},
         {"minimum_python": "3.15", "target_python": "py315", "features": []},
         {"package_type": "namespace", "namespace_name": "example_namespace"},
@@ -120,7 +125,7 @@ def test_generated_projects_ignore_tool_artifacts(
             "namespace_name": "example_namespace",
             "entry_points": ["cli"],
             "cli": "click",
-            "features": ["tasks", "docs", "doctest"],
+            "features": ["docs", "doctest"],
             "doctest": ["docstrings", "docs", "readme"],
         },
         {"entry_points": ["cli"], "cli": "click", "install": "uv pip"},
@@ -130,7 +135,7 @@ def test_generated_projects_ignore_tool_artifacts(
         {"pytest_testmon": "manual"},
         {"pytest_testmon": "automatic"},
         {
-            "features": ["tasks", "docs", "doctest"],
+            "features": ["docs", "doctest"],
             "doctest": ["docstrings", "docs", "readme"],
         },
     ],
@@ -180,11 +185,11 @@ def test_rendered_tooling_is_complete(
 ) -> None:
     """Check optional files, configuration, commands, and generated Python syntax."""
     project, data = generated
-    features = data.get("features", ["tasks", "docs"])
+    features = data.get("features", ["docs"])
     assert isinstance(features, list)
-    has_tasks = "tasks" in features
+    has_nox = data.get("nox", True)
     has_docs = "docs" in features
-    assert (project / "noxfile.py").exists() is has_tasks
+    assert (project / "noxfile.py").exists() is has_nox
     assert (project / "docs").exists() is has_docs
     assert (project / ".github/workflows/pages.yaml").exists() is has_docs
     assert (project / "scripts/coverage_badge.py").exists() is has_docs
@@ -249,10 +254,10 @@ def test_rendered_tooling_is_complete(
 @pytest.mark.parametrize(
     "policy",
     [
-        ({}, ["tasks", "docs"], False),
-        ({"require_typecheck": False}, [], False),
-        ({"require_typecheck": True}, ["tasks", "docs"], True),
-        ({"require_typecheck": True}, [], True),
+        ({}, ["docs"], False),
+        ({"require_typecheck": False, "nox": False}, [], False),
+        ({"require_typecheck": True}, ["docs"], True),
+        ({"require_typecheck": True, "nox": False}, [], True),
     ],
 )
 def test_typecheck_release_and_ci_policy(
@@ -412,7 +417,12 @@ def test_typecheck_level(
     "options",
     [
         {},
-        {"package_layout": "src", "package_type": "namespace", "features": []},
+        {
+            "package_layout": "src",
+            "package_type": "namespace",
+            "features": [],
+            "nox": False,
+        },
         {"package_manager": "pixi", "typecheck_source_only": False},
     ],
 )
@@ -467,7 +477,7 @@ def test_typecheck_source_scope(
         expected = [source]
         if not source_only:
             expected += ["tests", "scripts"]
-            if "tasks" in options.get("features", ["tasks", "docs"]):  # type: ignore
+            if options.get("nox", True):
                 expected.append("noxfile.py")
         assert typecheck.mypy_paths() == expected
         typecheck.main()
@@ -534,7 +544,7 @@ def test_generated_python_versions(
     )
     tests_job = checks_workflow["jobs"]["tests"]
     assert tests_job["strategy"]["matrix"]["python_version"] == python_versions
-    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
+    if "docs" in data.get("features", ["docs"]):  # type: ignore
         coverage_step = next(
             step
             for step in tests_job["steps"]
@@ -544,7 +554,7 @@ def test_generated_python_versions(
             coverage_step["if"]
             == f"${{{{ matrix.python_version == '{minimum_python}' }}}}"
         )
-    if "tasks" in data.get("features", ["tasks", "docs"]):  # type: ignore
+    if data.get("nox", True):
         assert (
             f'# requires-python = ">={minimum_python}"'
             in (project / "noxfile.py").read_text()
@@ -587,7 +597,7 @@ def test_generated_branch_and_changelog(
         "towncrier>=25.8" in config["dependency-groups"]["release"]
     ) is has_changelog
     assert ("Changelog" in config["project"]["urls"]) is has_changelog
-    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
+    if "docs" in data.get("features", ["docs"]):  # type: ignore
         assert (project / "docs/changelog.md").exists() is has_changelog
     release_workflow = yaml.safe_load(
         (project / ".github/workflows/release.yaml").read_text()
@@ -735,7 +745,7 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
             f"from {import_name}.cli import "
             in (project / "tests/test_cli.py").read_text()
         )
-    if "docs" in data.get("features", ["tasks", "docs"]):  # type: ignore
+    if "docs" in data.get("features", ["docs"]):  # type: ignore
         assert f"::: {import_name}" in (project / "docs/reference/api.md").read_text()
 
 
@@ -1060,6 +1070,86 @@ def test_legacy_namespace_answers_migrate_on_recopy(
     ).is_file()
 
 
+@pytest.mark.parametrize("old_nox", [False, True])
+def test_legacy_nox_answers_migrate_on_recopy(
+    tmp_path: Path,
+    template_source: Path,
+    old_nox: bool,  # noqa: FBT001
+) -> None:
+    """Preserve whether legacy task automation enabled Nox."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "nox": old_nox,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    answer_file = project / ".copier-answers.yml"
+    answers = yaml.safe_load(answer_file.read_text())
+    del answers["nox"]
+    answers["features"] = ["tasks", "docs"] if old_nox else ["docs"]
+    answer_file.write_text(yaml.safe_dump(answers))
+    copier.run_recopy(project, defaults=True, overwrite=True, unsafe=True, quiet=True)
+    assert yaml.safe_load(answer_file.read_text())["nox"] is old_nox
+    assert (project / "noxfile.py").exists() is old_nox
+
+
+@pytest.mark.parametrize("package_manager", ["uv", "pixi", "mamba"])
+@pytest.mark.parametrize("nox", [False, True])
+@pytest.mark.parametrize("github_actions", [False, True])
+def test_nox_and_ci_are_independent(
+    tmp_path: Path,
+    template_source: Path,
+    package_manager: str,
+    nox: bool,  # noqa: FBT001
+    github_actions: bool,  # noqa: FBT001
+) -> None:
+    """Nox works without CI, and CI can run tests without Nox."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "minimum_python": "3.15",
+            "target_python": "py315",
+            "package_manager": package_manager,
+            "nox": nox,
+            "github_actions": github_actions,
+            "features": [],
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    assert (project / "noxfile.py").exists() is nox
+    assert ("\nnox:\n" in (project / "Makefile").read_text()) is nox
+    config = tomllib.loads((project / "pyproject.toml").read_text())
+    assert (
+        any(
+            dependency.startswith("nox")
+            for dependency in config["dependency-groups"]["test"]
+        )
+        is nox
+    )
+    workflow = project / ".github/workflows/checks.yaml"
+    assert workflow.exists() is github_actions
+    if github_actions:
+        jobs = yaml.safe_load(workflow.read_text())["jobs"]
+        steps = jobs["tests"]["steps"]
+        commands = "\n".join(step.get("run", "") for step in steps)
+        assert (" -s tests-${{ matrix.python_version }}" in commands) is nox
+        if not nox:
+            assert "coverage run -m pytest" in commands
+
+
 @pytest.mark.parametrize(
     "options",
     [
@@ -1087,7 +1177,7 @@ def test_legacy_namespace_answers_migrate_on_recopy(
             "changelog": False,
             "features": [],
         },
-        {"package_manager": "mamba", "features": ["docs"]},
+        {"package_manager": "mamba", "features": ["docs"], "nox": False},
     ],
 )
 def test_optional_integrations(
@@ -1114,7 +1204,7 @@ def test_optional_integrations(
     actions = options.get("github_actions", public)
     publishing = options.get("pypi_publish", public)
     licensed = options.get("license", "MIT") != "none"
-    docs = "docs" in options.get("features", ["tasks", "docs"])  # type: ignore
+    docs = "docs" in options.get("features", ["docs"])  # type: ignore
     pixi = options.get("package_manager", "uv") == "pixi"
     mamba = options.get("package_manager", "uv") == "mamba"
     config = tomllib.loads((project / "pyproject.toml").read_text())
@@ -1150,7 +1240,7 @@ def test_optional_integrations(
             assert "pixi run" not in text
             assert "uv run" not in text
             assert "mamba.lock" not in text
-        if actions and "tasks" not in options.get("features", ["tasks", "docs"]):  # type: ignore
+        if actions and not options.get("nox", True):
             workflow = (project / ".github/workflows/checks.yaml").read_text()
             assert '"python=$PYTHON_VERSION"' in workflow
     assert ("urls" in config["project"]) is public

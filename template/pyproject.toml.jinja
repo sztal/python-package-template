@@ -78,7 +78,7 @@ dev = [
 test = [
   "coverage[toml]>=7.11",
   "ipdb>=0.13",
-{%- if tasks == "nox" %}
+{%- if nox %}
   "{{ 'nox[uv]' if package_manager == 'uv' else 'nox' }}>=2025.2.9",
 {%- endif %}
   "pytest>=9",

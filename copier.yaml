@@ -342,27 +342,31 @@ cli:
     Typer: typer
     Cyclopts: cyclopts
 
+nox:
+  type: bool
+  help: Set up Nox for local testing and checks?
+  default: >-
+    {{ 'tasks' in _copier_answers['features']
+       if 'features' in _copier_answers
+       and 'features' not in _copier_conf.data else true }}
+
 features:
   type: str
-  help: Which features to you want to use?
+  help: Which additional features do you want to use?
   multiselect: true
-  default: [tasks, docs]
-  choices:
-    Task automation: tasks
+  default: [docs]
+  choices: |-
+    {% if 'tasks' in _copier_answers.get('features', []) or 'tasks' in _copier_conf.data.get('features', []) %}
+    Legacy task automation: tasks
+    {% endif %}
     Documentation: docs
     Test interactive Python examples: doctest
 
-tasks:
-  type: str
-  help: Which task automation tool do you want to use?
-  default: "{{ 'nox' if 'tasks' in features else '' }}"
-  when: false
-
 install:
   type: str
-  help: How do you want to install dependencies when running tasks?
+  help: How do you want to install dependencies for Nox sessions?
   default: uv sync
-  when: "{{ tasks and package_manager == 'uv' }}"
+  when: "{{ nox and package_manager == 'uv' }}"
   choices:
     Install latest versions: uv pip
     Install locked versions: uv sync

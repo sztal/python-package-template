@@ -48,7 +48,7 @@ At other levels, `make typecheck` always fails on errors; when not required,
 `make check` and CI report the failure but continue.
 `typecheck_source_only` defaults to `true`; set it to `false` to also check
 tests and tooling. Mypy may still follow imports from the selected paths.
-{% if tasks == "nox" %}
+{% if nox %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example
 `{{ 'uv run noxfile.py' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name ~ ' nox' if package_manager == 'mamba' else 'pixi run --locked nox') }} -s tests-{{ minimum_python }} -- tests/test_version.py`.

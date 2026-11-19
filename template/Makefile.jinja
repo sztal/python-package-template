@@ -5,7 +5,7 @@
 {% if changelog %}
 .PHONY: release-notes
 {% endif %}
-{% if tasks == "nox" %}
+{% if nox %}
 .PHONY: nox
 {% endif %}
 {% if docs %}
@@ -33,7 +33,7 @@ help:
 	@echo "  wheel          Build wheel only"
 	@echo "  install        Install the package with development dependencies"
 	@echo "  test           Run the pytest suite"
-{% if tasks == "nox" %}
+{% if nox %}
 	@echo "  nox            Run the supported-Python test matrix"
 {% endif %}
 	@echo "  coverage       Run tests with a terminal coverage report"
@@ -92,7 +92,7 @@ install:
 test:
 	$(RUN) pytest
 
-{% if tasks == "nox" %}
+{% if nox %}
 nox:
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py -s tests{% else %}nox --tags tests{% endif %}
 
@@ -107,7 +107,7 @@ coverage-html:
 	$(RUN) coverage html
 
 lint:
-{% if tasks == "nox" %}
+{% if nox %}
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s lint
 {% else %}
 	$(RUN) pre-commit run --all-files
@@ -123,7 +123,7 @@ check-typecheck:
 	$(RUN) python -m scripts.typecheck --policy
 
 _typecheck:
-{% if tasks == "nox" %}
+{% if nox %}
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s typecheck
 {% else %}
 	$(RUN) mypy $(TYPECHECK_FLAGS) $(TYPECHECK_PATHS)
@@ -131,14 +131,14 @@ _typecheck:
 
 {% if docs %}
 docs:
-{% if tasks == "nox" %}
+{% if nox %}
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s docs
 {% else %}
 	$(RUN) {% if package_manager == 'uv' %}--group docs {% endif %}zensical build --clean --strict
 {% endif %}
 
 docs-serve:
-{% if tasks == "nox" %}
+{% if nox %}
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s autodocs
 {% else %}
 	$(RUN) {% if package_manager == 'uv' %}--group docs {% endif %}zensical serve --open

@@ -146,10 +146,12 @@ from the answers rather than prompted for separately.
 - `pytest_testmon`: `no` (default), `manual` to opt in with `pytest --testmon`,
   or `automatic` to use it by default. Coverage targets disable testmon so
   they run the full suite.
-- `features`: select task automation, documentation, and interactive example
-  testing. Task automation and documentation are selected by default; example
-  testing is not. Task automation uses Nox and documentation uses Zensical.
-- `install`: when task automation and uv are selected, choose locked
+- `features`: select documentation and interactive example testing.
+  Documentation is selected by default and uses Zensical.
+- `nox`: configure Nox sessions for local checks and the Python test matrix;
+  enabled by default, independently of GitHub Actions. CI uses Nox when
+  enabled and runs the checks directly otherwise.
+- `install`: when Nox and uv are selected, choose locked
   dependencies with `uv sync` (default) or latest versions with `uv pip`
   for Nox sessions.
 - `doctest`: when interactive example testing is selected, choose docstrings,
@@ -355,8 +357,8 @@ uv run copier copy --trust --defaults \
 ```
 
 At minimum, check the default flat layout, a `src` layout, a namespace layout,
-documentation and task automation both enabled and disabled, and the optional
-Code of Conduct. For generated projects, initialize Git, create a version tag,
+documentation and Nox both enabled and disabled, and the optional Code of
+Conduct. For generated projects, initialize Git, create a version tag,
 and run:
 
 ```bash

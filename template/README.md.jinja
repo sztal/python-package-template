@@ -92,7 +92,7 @@ make typecheck
 make build
 make check-dist
 ```
-{% if tasks == "nox" %}
+{% if nox %}
 Use `make nox` for the supported-Python test matrix and
 `{{ 'uv run noxfile.py' if package_manager == 'uv' else ('mamba run --name ' ~ mamba_environment_name ~ ' nox' if package_manager == 'mamba' else 'pixi run --locked nox') }} -s tests-{{ minimum_python }} -- tests/` for a focused Nox run.
 {% endif -%}
