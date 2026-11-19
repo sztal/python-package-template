@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import py_compile
 import shutil
@@ -235,6 +236,89 @@ def test_rendered_tooling_is_complete(
     assert "workflow_dispatch" in events
     assert "branches" not in events["push"]
     assert "scripts.release --dry-run" in (project / "RELEASING.md").read_text()
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        ({}, ["tasks", "docs"], False),
+        ({"require_typecheck": False}, [], False),
+        ({"require_typecheck": True}, ["tasks", "docs"], True),
+        ({"require_typecheck": True}, [], True),
+    ],
+)
+def test_typecheck_release_and_ci_policy(
+    tmp_path: Path,
+    template_source: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    policy: tuple[dict[str, bool], list[str], bool],
+) -> None:
+    """Keep typecheck advisory or required in both release and shared CI."""
+    option, features, required = policy
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "features": features,
+            **option,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    workflow = yaml.safe_load((project / ".github/workflows/checks.yaml").read_text())
+    steps = workflow["jobs"]["checks"]["steps"]
+    typecheck = next(step for step in steps if step.get("run") == "make typecheck")
+    assert typecheck.get("continue-on-error", False) is not required
+    assert all(
+        not step.get("continue-on-error", False)
+        for step in steps
+        if step is not typecheck
+    )
+
+    spec = importlib.util.spec_from_file_location(
+        "generated_check", project / "scripts/check.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check)
+    monkeypatch.setattr(check, "tracked_changes", lambda: (b"", b""))
+    calls: list[str] = []
+    failing = "typecheck"
+
+    def run(command: list[str], *, check: bool) -> None:
+        assert check
+        calls.append(command[1])
+        if command[1] == failing:
+            raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(check.subprocess, "run", run)
+    if required:
+        with pytest.raises(subprocess.CalledProcessError):
+            check.main()
+        assert calls == ["lint", "test", "typecheck"]
+    else:
+        check.main()
+        assert calls == [
+            "lint",
+            "test",
+            "typecheck",
+            *(["docs"] if "docs" in features else []),
+            "build",
+            "check-dist",
+        ]
+        assert "Type checking failed" in capsys.readouterr().err
+
+    calls.clear()
+    failing = "test"
+    with pytest.raises(subprocess.CalledProcessError):
+        check.main()
+    assert calls == ["lint", "test"]
 
 
 def test_generated_python_versions(

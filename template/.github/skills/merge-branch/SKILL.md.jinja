@@ -32,7 +32,10 @@ follows the squash-merge rule below.
 3. This project does not use a changelog or Towncrier; do not create fragments.
 {% endif -%}
 4. Run the relevant tests, lint, and other required project checks on the
-   integrated result. Report failures or conflicts; do not bypass checks.
+   integrated result. Report failures or conflicts; do not bypass required checks.
+{% if not require_typecheck %}
+   Type checking is advisory and does not block merging.
+{% endif %}
 
 ## Merge
 

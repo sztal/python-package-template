@@ -130,6 +130,8 @@ from the answers rather than prompted for separately.
   installing project dependencies.
 - `integration_branch`: the branch used for integration and releases;
   defaults to `master`.
+- `require_typecheck`: require passing type checks for merge and release
+  validation; disabled by default. Type checking still runs and reports errors.
 - `changelog`: enable changelog and Towncrier support; enabled by default.
   Fragments are added when a development branch is merged into the integration
   branch and assembled during release preparation.

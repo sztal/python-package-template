@@ -58,6 +58,9 @@ jobs:
       - uses: {% if package_manager == 'uv' %}astral-sh/setup-uv@v7{% else %}prefix-dev/setup-pixi@v0.11.3{% endif %}
 {% endif %}
       - run: make typecheck
+{% if not require_typecheck %}
+        continue-on-error: true
+{% endif %}
 {% if docs %}
       - run: make docs
 {% endif %}

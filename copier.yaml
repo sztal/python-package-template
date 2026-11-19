@@ -133,6 +133,11 @@ integration_branch:
     Enter a valid Git branch name using letters, numbers, hyphens, underscores, dots, and slashes.
     {% endif %}
 
+require_typecheck:
+  type: bool
+  help: Require passing type checks for merging and releasing?
+  default: false
+
 changelog:
   type: bool
   help: Use a changelog and Towncrier?

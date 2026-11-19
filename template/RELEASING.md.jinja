@@ -40,6 +40,14 @@ entry points. Old files in `dist/` must be removed
 explicitly before checking another version. `TAG=v1.2.3` additionally requires
 a clean checkout, an annotated tag at the current commit, and an exact version
 match.
+{% if require_typecheck %}
+Type checking must pass for `make check`, release preparation{% if github_actions %},
+and CI validation{% endif %}.
+{% else %}
+Type checking still runs and reports errors, but its failure does not block
+`make check`, release preparation{% if github_actions %}, or CI validation{% endif %}.
+Running `make typecheck` directly still fails on errors.
+{% endif %}
 {% if tasks == "nox" %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example
