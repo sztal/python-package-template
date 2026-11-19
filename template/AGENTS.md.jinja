@@ -31,6 +31,7 @@ When merging a development branch into `{{ integration_branch }}`, use
 detailed body covering the changes, their rationale, and validation.
 
 {% if changelog -%}
+Do development work on dedicated branches.
 Changelog fragments are added only when merging into `{{ integration_branch }}`.
 Review the incoming branch's commit messages and Git history not yet in
 `{{ integration_branch }}` (for example, `git log {{ integration_branch }}..SOURCE`)
@@ -42,10 +43,9 @@ This project does not use a changelog or Towncrier.
 {% endif %}
 ## Development notes
 
-Use `wiki/` to record concise, durable development context.
-Read [wiki/example.md](wiki/example.md) before starting a note, and
-replace it with notes that capture decisions, validation results, and useful
-follow-up work.
+Use `wiki/` for package overviews, `wiki/api/` for API documentation,
+`wiki/dev/` for developer notes, and `wiki/tutorials/` for hands-on guides.
+Replace [wiki/example.md](wiki/example.md) with useful project documentation.
 
 ## Validation
 

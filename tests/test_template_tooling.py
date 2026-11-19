@@ -336,12 +336,14 @@ def test_generated_branch_and_changelog(
         assert "git merge --squash" in guidance
         assert "their rationale, and validation" in guidance
     if has_changelog:
+        assert "Do development work on dedicated branches." in guide
         assert f"merge into `{branch}`" in merge_skill
         assert "commit messages and Git history" in merge_skill
         assert (
             "--notes-file" in (project / ".github/workflows/release.yaml").read_text()
         )
     else:
+        assert "Do development work on dedicated branches." not in guide
         assert "do not create fragments" in merge_skill
         assert (
             "--generate-notes"
