@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 import nox
+from scripts.typecheck import mypy_args, mypy_paths
 
 nox.needs_version = ">=2025.2.9"
 nox.options.default_venv_backend = "{{ 'uv' if package_manager == 'uv' else 'mamba' }}"
@@ -105,6 +106,9 @@ def lint(session: nox.Session) -> None:
 @nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"]{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
 def typecheck(session: nox.Session) -> None:
     """Typecheck Python code."""
+    args = mypy_args()
+    if args is None:
+        session.skip("Type checking is disabled.")
 {%- if package_manager == 'mamba' or install == 'uv pip' %}
     session.install(".", "--group", "type")
 {%- else %}
@@ -117,13 +121,7 @@ def typecheck(session: nox.Session) -> None:
         session=session,
     )
 {%- endif %}
-    paths = (
-        "{{ package_path }}",
-        "tests",
-        "scripts",
-        "noxfile.py",
-    )
-    session.run("mypy", *(session.posargs or paths))
+    session.run("mypy", *args, *(session.posargs or mypy_paths()))
 
 {% if docs %}
 @nox.session(python=DEFAULT_PYTHON_VERSION, tags=["checks"]{% if package_manager == 'mamba' %}, venv_params=MAMBA_OPTIONS{% endif %})
@@ -185,6 +183,7 @@ import os
 from pathlib import Path
 
 import nox
+from scripts.typecheck import mypy_args, mypy_paths
 
 nox.options.sessions = (
     "lint",
@@ -235,12 +234,16 @@ def lint(session: nox.Session) -> None:
 @nox.session(python=False)
 def typecheck(session: nox.Session) -> None:
     """Run mypy."""
+    args = mypy_args()
+    if args is None:
+        session.skip("Type checking is disabled.")
     session.run(
         "pixi",
         "run",
         "--locked",
         "mypy",
-        *(session.posargs or ("{{ package_path }}", "tests", "scripts", "noxfile.py")),
+        *args,
+        *(session.posargs or mypy_paths()),
     )
 {% if docs %}
 

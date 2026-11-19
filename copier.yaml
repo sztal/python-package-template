@@ -133,6 +133,23 @@ integration_branch:
     Enter a valid Git branch name using letters, numbers, hyphens, underscores, dots, and slashes.
     {% endif %}
 
+typecheck_level:
+  type: str
+  help: How strictly should mypy check the project?
+  default: >-
+    {{ 'strict' if 'require_typecheck' in _copier_answers
+       and 'typecheck_level' not in _copier_answers
+       and 'require_typecheck' not in _copier_conf.data else 'basic' }}
+  choices:
+    None: none
+    Basic: basic
+    Strict: strict
+
+typecheck_source_only:
+  type: bool
+  help: Type-check only the package source, excluding tests and tooling?
+  default: true
+
 require_typecheck:
   type: bool
   help: Require passing type checks for merging and releasing?

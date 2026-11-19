@@ -130,8 +130,16 @@ from the answers rather than prompted for separately.
   installing project dependencies.
 - `integration_branch`: the branch used for integration and releases;
   defaults to `master`.
+- `typecheck_level`: `none`, `basic` (default), or `strict`. Basic also checks
+  unannotated function bodies; strict enables mypy's strict checks and additional
+  diagnostics.
+- `typecheck_source_only`: check only the package source by default. Set to
+  false to also check tests and tooling. Mypy may still follow imports from
+  the selected paths.
 - `require_typecheck`: require passing type checks for merge and release
-  validation; disabled by default. Type checking still runs and reports errors.
+  validation; disabled by default. Enabled checks still run and report errors.
+  These settings can be changed after generation in `[tool.project-checks]` in
+  `pyproject.toml`; they apply to local validation and CI.
 - `changelog`: enable changelog and Towncrier support; enabled by default.
   Fragments are added when a development branch is merged into the integration
   branch and assembled during release preparation.
@@ -180,6 +188,8 @@ package layout or documentation settings.
 Existing projects using `main` should set `integration_branch=main` when
 updating; the new default is `master`. Review existing changelog files when
 disabling changelog support, as project-specific files may be preserved.
+Existing projects previously used strict type checking; the new
+`typecheck_level` defaults to `strict` when updating their saved answers.
 The newly visible `distribution_name` defaults to the slug of `project_name`;
 if an existing project used a different distribution name, enter it when
 prompted and review the update diff.

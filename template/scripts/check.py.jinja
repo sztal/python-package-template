@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-{% if not require_typecheck %}import sys
-{% endif %}
 
 
 def tracked_changes() -> tuple[bytes, bytes]:
@@ -21,21 +19,15 @@ def main() -> None:
     for target in (
         "lint",
         "test",
-        "typecheck",
+        "check-typecheck",
 {%- if docs %}
         "docs",
 {%- endif %}
         "build",
         "check-dist",
     ):
-{% if not require_typecheck %}        try:
-            subprocess.run(["make", target], check=True)
-        except subprocess.CalledProcessError:
-            if target != "typecheck":
-                raise
-            print("Type checking failed (not required); continuing.", file=sys.stderr)
-{% else %}        subprocess.run(["make", target], check=True)
-{% endif %}        if tracked_changes() != before:
+        subprocess.run(["make", target], check=True)
+        if tracked_changes() != before:
             raise RuntimeError(
                 f"{target} modified tracked files; review and rerun checks"
             )

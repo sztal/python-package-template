@@ -184,13 +184,7 @@ mypy_path = "{{ package_root }}"
 explicit_package_bases = true
 {%- endif %}
 python_version = "3.{{ target_python[3:] }}"
-warn_unreachable = true
-enable_error_code = [
-  "ignore-without-code",
-  "redundant-expr",
-  "truthy-bool",
-]
-strict = true
+check_untyped_defs = true
 pretty = true
 
 [tool.pytest]
@@ -210,6 +204,9 @@ addopts = [
 {%- endif %}
   "--showlocals",
 ]
+{%- if package_type == 'namespace' %}
+consider_namespace_packages = true
+{%- endif %}
 filterwarnings = [
   "error",
 ]
@@ -288,4 +285,8 @@ type = [
   { directory = "changed", name = "Changed", showcontent = true },
   { directory = "fixed", name = "Fixed", showcontent = true },
 ]
-{% endif -%}
+{% endif %}
+[tool.project-checks]
+typecheck_level = "{{ typecheck_level }}"
+typecheck_source_only = {{ 'true' if typecheck_source_only else 'false' }}
+require_typecheck = {{ 'true' if require_typecheck else 'false' }}

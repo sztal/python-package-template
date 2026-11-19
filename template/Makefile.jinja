@@ -1,4 +1,4 @@
-.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check check-dist release
+.PHONY: help clean build wheel install init test coverage coverage-html lint format typecheck check-typecheck _typecheck check check-dist release
 {% if pypi_publish %}
 .PHONY: publish
 {% endif %}
@@ -117,10 +117,16 @@ format:
 	$(RUN) ruff format .
 
 typecheck:
+	$(RUN) python -m scripts.typecheck
+
+check-typecheck:
+	$(RUN) python -m scripts.typecheck --policy
+
+_typecheck:
 {% if tasks == "nox" %}
 	$(RUN) {% if package_manager == 'uv' %}noxfile.py{% else %}nox{% endif %} -s typecheck
 {% else %}
-	$(RUN) mypy {{ package_path }} tests scripts
+	$(RUN) mypy $(TYPECHECK_FLAGS) $(TYPECHECK_PATHS)
 {% endif %}
 
 {% if docs %}

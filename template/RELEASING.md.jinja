@@ -40,14 +40,14 @@ entry points. Old files in `dist/` must be removed
 explicitly before checking another version. `TAG=v1.2.3` additionally requires
 a clean checkout, an annotated tag at the current commit, and an exact version
 match.
-{% if require_typecheck %}
-Type checking must pass for `make check`, release preparation{% if github_actions %},
-and CI validation{% endif %}.
-{% else %}
-Type checking still runs and reports errors, but its failure does not block
-`make check`, release preparation{% if github_actions %}, or CI validation{% endif %}.
-Running `make typecheck` directly still fails on errors.
-{% endif %}
+Configure type checking in `[tool.project-checks]` in `pyproject.toml`:
+`typecheck_level` is `none`, `basic`, or `strict`, and `require_typecheck`
+controls whether failures block `make check`, release preparation{% if github_actions %},
+and CI validation{% endif %}. When the level is `none`, checks are skipped.
+At other levels, `make typecheck` always fails on errors; when not required,
+`make check` and CI report the failure but continue.
+`typecheck_source_only` defaults to `true`; set it to `false` to also check
+tests and tooling. Mypy may still follow imports from the selected paths.
 {% if tasks == "nox" %}
 `make nox` runs the supported-Python Nox matrix. For a focused run, pass a
 test path after `--`, for example

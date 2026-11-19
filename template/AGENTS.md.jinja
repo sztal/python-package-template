@@ -56,10 +56,8 @@ make lint
 make typecheck
 make test
 ```
-{% if not require_typecheck %}
-Type checking is advisory for merging and releasing; report failures, but they
-do not block those operations.
-{% endif %}
+Type-checking level and merge/release policy are configured in
+`[tool.project-checks]` in `pyproject.toml`.
 {% if tasks == "nox" %}
 Use `make nox` for the supported-Python matrix.
 {% endif %}

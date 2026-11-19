@@ -194,7 +194,7 @@ def test_rendered_tooling_is_complete(
         assert contents.endswith("\n")
         assert not contents.endswith("\n\n")
         assert isinstance(yaml.safe_load(contents), dict)
-    for name in ("check", "distributions", "publish", "release"):
+    for name in ("check", "distributions", "publish", "release", "typecheck"):
         py_compile.compile(str(project / "scripts" / f"{name}.py"), doraise=True)
     make = shutil.which("make")
     assert make is not None
@@ -203,6 +203,11 @@ def test_rendered_tooling_is_complete(
     )
     with (project / "pyproject.toml").open("rb") as stream:
         config = tomllib.load(stream)
+    assert config["tool"]["project-checks"] == {
+        "typecheck_level": "basic",
+        "typecheck_source_only": True,
+        "require_typecheck": False,
+    }
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
     testmon = data.get("pytest_testmon", "no")
     assert ("pytest-testmon>=2.3.0" in config["dependency-groups"]["test"]) is (
@@ -210,6 +215,9 @@ def test_rendered_tooling_is_complete(
     )
     assert ("--testmon" in config["tool"]["pytest"]["addopts"]) is (
         testmon == "automatic"
+    )
+    assert config["tool"]["pytest"].get("consider_namespace_packages") is (
+        True if data.get("package_type") == "namespace" else None
     )
     for target in ("coverage", "coverage-html"):
         result = subprocess.run(  # noqa: S603
@@ -272,53 +280,233 @@ def test_typecheck_release_and_ci_policy(
     )
     workflow = yaml.safe_load((project / ".github/workflows/checks.yaml").read_text())
     steps = workflow["jobs"]["checks"]["steps"]
-    typecheck = next(step for step in steps if step.get("run") == "make typecheck")
-    assert typecheck.get("continue-on-error", False) is not required
-    assert all(
-        not step.get("continue-on-error", False)
-        for step in steps
-        if step is not typecheck
+    typecheck = next(
+        step for step in steps if step.get("run") == "make check-typecheck"
     )
+    assert not typecheck.get("continue-on-error", False)
 
+    spec = importlib.util.spec_from_file_location(
+        "generated_typecheck", project / "scripts/typecheck.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    typecheck_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(typecheck_module)
+    calls: list[list[str]] = []
+
+    def run(command: list[str], *, check: bool) -> None:
+        assert check
+        calls.append(command)
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(typecheck_module.subprocess, "run", run)
+    monkeypatch.setattr(sys, "argv", ["typecheck", "--policy"])
+    config = project / "pyproject.toml"
+    initial = config.read_text()
+    for current in (required, not required):
+        config.write_text(
+            initial.replace(
+                f"require_typecheck = {str(required).lower()}",
+                f"require_typecheck = {str(current).lower()}",
+            )
+        )
+        if current:
+            with pytest.raises(subprocess.CalledProcessError):
+                typecheck_module.main()
+        else:
+            typecheck_module.main()
+            assert "Type checking failed" in capsys.readouterr().err
+    assert all(command[1] == "_typecheck" for command in calls)
+    monkeypatch.setattr(sys, "argv", ["typecheck"])
+    config.write_text(
+        initial.replace("require_typecheck = true", "require_typecheck = false")
+    )
+    with pytest.raises(subprocess.CalledProcessError):
+        typecheck_module.main()
+
+    assert_check_runs_policy(project, monkeypatch)
+
+
+def assert_check_runs_policy(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify local validation uses the same policy-aware target as CI."""
     spec = importlib.util.spec_from_file_location(
         "generated_check", project / "scripts/check.py"
     )
     assert spec is not None
     assert spec.loader is not None
-    check = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(check)
-    monkeypatch.setattr(check, "tracked_changes", lambda: (b"", b""))
-    calls: list[str] = []
-    failing = "typecheck"
+    check_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check_module)
+    monkeypatch.setattr(check_module, "tracked_changes", lambda: (b"", b""))
+    calls: list[list[str]] = []
 
-    def run(command: list[str], *, check: bool) -> None:
+    def run_successfully(command: list[str], *, check: bool) -> None:
         assert check
-        calls.append(command[1])
-        if command[1] == failing:
-            raise subprocess.CalledProcessError(1, command)
+        calls.append(command)
 
-    monkeypatch.setattr(check.subprocess, "run", run)
-    if required:
-        with pytest.raises(subprocess.CalledProcessError):
-            check.main()
-        assert calls == ["lint", "test", "typecheck"]
-    else:
-        check.main()
-        assert calls == [
-            "lint",
-            "test",
-            "typecheck",
-            *(["docs"] if "docs" in features else []),
-            "build",
-            "check-dist",
-        ]
-        assert "Type checking failed" in capsys.readouterr().err
+    monkeypatch.setattr(check_module.subprocess, "run", run_successfully)
+    check_module.main()
+    assert ["make", "check-typecheck"] in calls
 
-    calls.clear()
-    failing = "test"
-    with pytest.raises(subprocess.CalledProcessError):
-        check.main()
-    assert calls == ["lint", "test"]
+
+@pytest.mark.parametrize("level", ["none", "basic", "strict"])
+def test_typecheck_level(
+    tmp_path: Path, template_source: Path, level: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Apply generated and subsequently edited type-check levels."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "typecheck_level": level,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    spec = importlib.util.spec_from_file_location(
+        "generated_typecheck", project / "scripts/typecheck.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    typecheck = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(typecheck)
+    config = project / "pyproject.toml"
+    assert (
+        tomllib.loads(config.read_text())["tool"]["project-checks"]["typecheck_level"]
+        == level
+    )
+    commands: list[list[str]] = []
+
+    def run_successfully(command: list[str], *, check: bool) -> None:
+        assert check
+        commands.append(command)
+
+    monkeypatch.setattr(typecheck.subprocess, "run", run_successfully)
+    for current in ("none", "basic", "strict"):
+        config.write_text(
+            config.read_text().replace(
+                f'typecheck_level = "{level}"', f'typecheck_level = "{current}"'
+            )
+        )
+        level = current
+        commands.clear()
+        typecheck.main()
+        if current == "none":
+            assert not commands
+        else:
+            assert len(commands) == 1
+            assert ("--strict" in commands[0][2]) is (current == "strict")
+    config.write_text(
+        config.read_text().replace(
+            'typecheck_level = "strict"', 'typecheck_level = "invalid"'
+        )
+    )
+    with pytest.raises(ValueError, match="Invalid"):
+        typecheck.main()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"package_layout": "src", "package_type": "namespace", "features": []},
+        {"package_manager": "pixi", "typecheck_source_only": False},
+    ],
+)
+def test_typecheck_source_scope(
+    tmp_path: Path,
+    template_source: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    options: dict[str, object],
+) -> None:
+    """Apply the source-only option at generation and after editing settings."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            **options,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    spec = importlib.util.spec_from_file_location(
+        "generated_typecheck", project / "scripts/typecheck.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    typecheck = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(typecheck)
+    config = project / "pyproject.toml"
+    initial = config.read_text()
+    initial_scope = options.get("typecheck_source_only", True)
+    assert tomllib.loads(initial)["tool"]["project-checks"][
+        "typecheck_source_only"
+    ] is (initial_scope)
+    commands: list[list[str]] = []
+
+    def run_successfully(command: list[str], *, check: bool) -> None:
+        assert check
+        commands.append(command)
+
+    monkeypatch.setattr(typecheck.subprocess, "run", run_successfully)
+    for source_only in (True, False):
+        config.write_text(
+            initial.replace(
+                f"typecheck_source_only = {str(initial_scope).lower()}",
+                f"typecheck_source_only = {str(source_only).lower()}",
+            )
+        )
+        source, _ = package_locations(options)
+        expected = [source]
+        if not source_only:
+            expected += ["tests", "scripts"]
+            if "tasks" in options.get("features", ["tasks", "docs"]):  # type: ignore
+                expected.append("noxfile.py")
+        assert typecheck.mypy_paths() == expected
+        typecheck.main()
+        assert commands[-1][3] == f"TYPECHECK_PATHS={' '.join(expected)}"
+
+    config.write_text(
+        initial.replace(
+            "typecheck_source_only = true", 'typecheck_source_only = "true"'
+        ).replace("typecheck_source_only = false", 'typecheck_source_only = "false"')
+    )
+    with pytest.raises(ValueError, match="Invalid"):
+        typecheck.mypy_paths()
+
+
+def test_legacy_typecheck_answers_migrate_on_recopy(
+    tmp_path: Path, template_source: Path
+) -> None:
+    """Keep strict checking when updating projects without a saved level."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={"project_name": "example-package", "project_description": "Example"},
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    answer_file = project / ".copier-answers.yml"
+    answers = yaml.safe_load(answer_file.read_text())
+    del answers["typecheck_level"]
+    answer_file.write_text(yaml.safe_dump(answers))
+    copier.run_recopy(project, defaults=True, overwrite=True, unsafe=True, quiet=True)
+    assert yaml.safe_load(answer_file.read_text())["typecheck_level"] == "strict"
+    assert (
+        tomllib.loads((project / "pyproject.toml").read_text())["tool"][
+            "project-checks"
+        ]["typecheck_level"]
+        == "strict"
+    )
 
 
 def test_generated_python_versions(

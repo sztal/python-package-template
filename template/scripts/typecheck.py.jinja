@@ -1,0 +1,79 @@
+"""Apply the project's type-checking level and validation policy."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
+
+
+def settings() -> tuple[str, bool, bool]:
+    """Read and validate the type-checking settings."""
+    with PYPROJECT.open("rb") as stream:
+        config = tomllib.load(stream)["tool"]["project-checks"]
+    level = config["typecheck_level"]
+    required = config["require_typecheck"]
+    source_only = config["typecheck_source_only"]
+    if (
+        level not in ("none", "basic", "strict")
+        or not isinstance(required, bool)
+        or not isinstance(source_only, bool)
+    ):
+        message = "Invalid [tool.project-checks] type-checking settings"
+        raise ValueError(message)
+    return level, required, source_only
+
+
+def mypy_args() -> list[str] | None:
+    """Return mypy flags for the selected level, or None when disabled."""
+    level, _, _ = settings()
+    if level == "none":
+        return None
+    if level == "basic":
+        return []
+    return [
+        "--strict",
+        "--warn-unreachable",
+        "--enable-error-code=ignore-without-code",
+        "--enable-error-code=redundant-expr",
+        "--enable-error-code=truthy-bool",
+    ]
+
+
+def mypy_paths() -> list[str]:
+    """Return paths to check for the configured scope."""
+    _, _, source_only = settings()
+    paths = [{{ package_path | tojson }}]
+    if not source_only:
+        paths.extend(["tests", "scripts"{% if tasks == "nox" %}, "noxfile.py"{% endif %}])
+    return paths
+
+
+def main() -> None:
+    """Run mypy, optionally treating failures as advisory."""
+    args = mypy_args()
+    if args is None:
+        print("Type checking is disabled.")
+        return
+    _, required, _ = settings()
+    try:
+        subprocess.run(
+            [
+                "make",
+                "_typecheck",
+                f"TYPECHECK_FLAGS={' '.join(args)}",
+                f"TYPECHECK_PATHS={' '.join(mypy_paths())}",
+            ],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        if "--policy" not in sys.argv[1:] or required:
+            raise
+        print("Type checking failed (not required); continuing.", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
