@@ -26,12 +26,14 @@ installed with pip from `pyproject.toml` and are not locked.
 Keep changes focused, preserve public behavior unless the task intentionally
 changes it, and add or update tests for behavior changes.
 
+Work on the user's current branch unless a different branch is requested or
+clearly required by the task; do not create a branch by default.
+
 When merging a development branch into `{{ integration_branch }}`, use
 `git merge --squash` and create one commit with a descriptive subject and a
 detailed body covering the changes, their rationale, and validation.
 
 {% if changelog -%}
-Do development work on dedicated branches.
 Changelog fragments are added only when merging into `{{ integration_branch }}`.
 Review the incoming branch's commit messages and Git history not yet in
 `{{ integration_branch }}` (for example, `git log {{ integration_branch }}..SOURCE`)

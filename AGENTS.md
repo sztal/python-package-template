@@ -5,6 +5,8 @@ projects. See [README.md](README.md) for the repository structure and workflow.
 
 ## Conventions
 
+- Work on the user's current branch unless a different branch is requested or
+  clearly required by the task; do not create a branch by default.
 - Do not maintain a changelog for this repository: do not update
   `CHANGELOG.md` or add changelog fragments for development work.
 - Generated projects may retain their own changelog and release tooling.

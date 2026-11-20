@@ -614,19 +614,19 @@ def test_generated_branch_and_changelog(
     merge_skill = (project / ".github/skills/merge-branch/SKILL.md").read_text()
     guide = (project / "AGENTS.md").read_text()
     assert f"branch into `{branch}`" in guide
+    assert "Work on the user's current branch" in guide
+    assert "clearly required by the task; do not create a branch by default." in guide
     assert f"merging into `{branch}`" in merge_skill
     for guidance in (guide, merge_skill):
         assert "git merge --squash" in guidance
         assert "their rationale, and validation" in guidance
     if has_changelog:
-        assert "Do development work on dedicated branches." in guide
         assert f"merge into `{branch}`" in merge_skill
         assert "commit messages and Git history" in merge_skill
         assert (
             "--notes-file" in (project / ".github/workflows/release.yaml").read_text()
         )
     else:
-        assert "Do development work on dedicated branches." not in guide
         assert "do not create fragments" in merge_skill
         assert (
             "--generate-notes"

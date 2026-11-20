@@ -322,10 +322,11 @@ inspect the actual repository, replace placeholders, and adapt the guide and
 skills to the project. Run it again when the structure, tooling, or workflow
 changes. Review its changes and validation results.
 
-The generated guide requires squash-merging development branches into the
-configured integration branch. When changelog support is enabled, it also
-calls for dedicated development branches and adds fragments at integration
-merge time; release preparation assembles them. Building, merging, pushing,
+The generated guide directs agents to work on the current branch unless
+otherwise requested or clearly required, and requires squash-merging development
+branches into the configured integration branch. When changelog support is
+enabled, it calls for fragments at integration merge time; release preparation
+assembles them. Building, merging, pushing,
 tagging, and publishing are separate actions: the merge and release skills
 require explicit authorization for the relevant operations.
 

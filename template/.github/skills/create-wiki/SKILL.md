@@ -27,9 +27,9 @@ and existing project conventions:
 For developer workflow notes, check the project's integration branch and
 changelog policy. By default, prefer `git merge --squash` when merging
 development branches into the integration branch (`master` unless configured
-otherwise). If a changelog is used, describe work on dedicated branches and
-adding changelog entries or fragments only at the integration merge, not for
-individual commits or merges into other branches. Distinguish this from any
+otherwise). If a changelog is used, describe adding changelog entries or
+fragments only at the integration merge, not for individual commits or merges
+into other branches. Distinguish this from any
 release-time assembly of the changelog. Respect documented project-specific
 policies and do not claim an unverified workflow is already in use.
 
