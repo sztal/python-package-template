@@ -39,18 +39,16 @@ lowercase, hyphenated filenames unless the project uses another convention.
 
 ## Example testing
 
-When creating a wiki, normally ask the user whether to configure discovery and
-testing of its examples, unless they have already given clear instructions.
-If they decline, leave test configuration unchanged. If they agree, inspect the
-existing test runner and documentation tooling, then configure a compatible
-approach where feasible. Preserve existing test discovery and follow the
-project's dependency and environment conventions.
+Wiki examples are not run via pytest by convention. Do not ask about or
+automatically configure their discovery or testing. Check examples against the
+project's implementation and, when practical, validate them independently.
 
-Choose an example format the configured runner actually executes; do not assume
-ordinary Markdown code fences are collected by pytest's doctest support. Verify
-collection of representative wiki examples and run them, along with relevant
-existing tests. If there are no executable examples yet, or configuration is not
-feasible, report the limitation rather than claiming examples were tested.
+This differs from examples under `docs/`: in projects using `docs/`, set up
+those examples to be compatible with automatic pytest/doctest execution.
+Use a format and configuration the runner actually collects; ordinary
+Markdown code fences are not automatically collected by pytest's doctest
+support. Verify collection and execution when configuring documentation tests.
+This wiki workflow does not itself configure or modify `docs/` tests.
 
 ## Writing and validation
 
@@ -59,9 +57,9 @@ feasible, report the limitation rather than claiming examples were tested.
 2. Write pages suited to their audience. Link to relevant local sources and use
    diagrams or tables only when they clarify the topic.
 3. Verify that pages are supported by their sources, internally consistent, and
-   located under `wiki/`. Validate any approved test configuration as above.
+   located under `wiki/`. Report example checks and any limitations.
 
 Do not use the wiki as a bug backlog or session log. Report confirmed source
 defects for the project's bug ledger rather than recording them in a wiki
-page. Do not modify source, tests, or other documentation except as needed for
-the approved example-testing setup.
+page. Do not modify source, tests, or other documentation as part of this
+workflow.
