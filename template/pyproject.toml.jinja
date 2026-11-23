@@ -1,8 +1,9 @@
 [build-system]
 build-backend = "hatchling.build"
 requires = [
+  "hatch-vcs>=0.5",
   "hatchling>=1.27",
-  "uv-dynamic-versioning>=0.14",
+  "setuptools-scm>=10",
 ]
 
 [project]
@@ -64,9 +65,9 @@ urls.Issues = "{{ repository_url }}/issues"
 urls.Repository = "{{ repository_url }}"
 {%- endif %}
 {% if cli == 'typer' or cli == 'cyclopts' -%}
-scripts.{{ distribution_name | tojson }} = "{{ import_name }}.cli:app"
+scripts.{{ distribution_name }} = "{{ import_name }}.cli:app"
 {% elif cli -%}
-scripts.{{ distribution_name | tojson }} = "{{ import_name }}.cli:main"
+scripts.{{ distribution_name }} = "{{ import_name }}.cli:main"
 {% endif %}
 [dependency-groups]
 dev = [
@@ -116,7 +117,18 @@ release = [
 ]
 
 [tool.hatch]
-version.source = "uv-dynamic-versioning"
+version.source = "vcs"
+{%- if annotated_tags_only %}
+version.raw-options.scm.git.describe_command = [
+  "git",
+  "describe",
+  "--dirty",
+  "--long",
+  "--abbrev=40",
+  "--match",
+  "v[0-9]*",
+]
+{%- endif %}
 {%- if package_type == 'namespace' %}
 build.targets.wheel.only-include = [
   "{{ package_path.removeprefix('./') }}",
@@ -129,12 +141,20 @@ build.targets.wheel.packages = [
   "{{ package_path }}",
 ]
 {%- endif %}
+{%- if package_manager == 'uv' %}
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { git = { commit = true, tags = true } },
+]
+{%- endif %}
 
 {% if package_manager == 'pixi' -%}
 [tool.pixi]
 workspace.channels = [ "conda-forge" ]
 workspace.platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
-pypi-dependencies.{{ distribution_name | tojson }} = { path = ".", editable = true }
+pypi-dependencies.{{ distribution_name }} = { path = ".", editable = true }
 feature.development.dependencies.python = "3.{{ target_python[3:] }}.*"
 {% for minor in range(minimum_python.split('.')[1] | int, 16) %}feature.py3{{ minor }}.dependencies.python = "3.{{ minor }}.*"
 {% endfor %}environments.default = { features = [ "development", "dev"{% if docs %}, "docs"{% endif %} ] }

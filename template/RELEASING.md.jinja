@@ -1,8 +1,12 @@
 # Building and releasing
 
 This project uses `{{ integration_branch }}` for integration and annotated Git tags for versions.
-Hatchling and `uv-dynamic-versioning` derive the package version from Git;
+Hatchling and `hatch-vcs` (setuptools-scm) derive the package version from Git;
 do not manually edit a version field or use a version override for releases.
+{%- if annotated_tags_only %}
+Only annotated tags matching `v[0-9]*` define versions; lightweight tags are
+ignored and can serve as arbitrary anchors.
+{%- endif %}
 {% if package_manager == 'mamba' -%}
 Commit `environment.yaml` before preparing a release. Project dependencies
 are installed with pip and are not locked.

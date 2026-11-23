@@ -15,6 +15,7 @@ from pathlib import Path
 import copier
 import pytest
 import yaml
+from packaging.version import Version
 
 MIN_COVERAGE = 90
 
@@ -109,6 +110,7 @@ def test_generated_projects_ignore_tool_artifacts(
 @pytest.fixture(
     params=[
         {},
+        {"package_layout": "flat"},
         {
             "package_layout": "src",
             "features": [],
@@ -117,7 +119,11 @@ def test_generated_projects_ignore_tool_artifacts(
         },
         {"minimum_python": "3.14", "target_python": "py314"},
         {"minimum_python": "3.15", "target_python": "py315", "features": []},
-        {"package_type": "namespace", "namespace_name": "example_namespace"},
+        {
+            "package_layout": "flat",
+            "package_type": "namespace",
+            "namespace_name": "example_namespace",
+        },
         {"package_layout": "src", "package_type": "namespace", "features": []},
         {
             "package_layout": "src",
@@ -140,7 +146,8 @@ def test_generated_projects_ignore_tool_artifacts(
         },
     ],
     ids=(
-        "flat-standard-default",
+        "src-standard-default",
+        "flat-standard",
         "src-standard-no-options",
         "minimum-and-target-314",
         "minimum-and-target-315",
@@ -699,7 +706,7 @@ def test_invalid_integration_branch_is_rejected(
 
 def package_locations(data: dict[str, object]) -> tuple[str, str]:
     """Return the expected source path and import name for a generated project."""
-    root = "src" if data.get("package_layout") == "src" else "."
+    root = "." if data.get("package_layout") == "flat" else "src"
     if data.get("package_type") == "namespace":
         namespace = data.get("namespace_name", "example_package")
         return f"{root}/{namespace}/example_package", f"{namespace}.example_package"
@@ -720,11 +727,11 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
     if data.get("package_type") == "namespace":
         assert wheel["only-include"] == [source.removeprefix("./")]
         assert wheel.get("sources", []) == (
-            ["src"] if data.get("package_layout") == "src" else []
+            [] if data.get("package_layout") == "flat" else ["src"]
         )
         assert config["tool"]["mypy"]["explicit_package_bases"]
         assert config["tool"]["mypy"]["mypy_path"] == (
-            "src" if data.get("package_layout") == "src" else "."
+            "." if data.get("package_layout") == "flat" else "src"
         )
     else:
         assert wheel["packages"] == [source]
@@ -751,7 +758,7 @@ def test_generated_package_layout(generated: tuple[Path, dict[str, object]]) -> 
 
 @pytest.mark.parametrize(
     ("distribution_name", "package_manager"),
-    [(None, "uv"), ("montec-common", "uv"), ("montec.common", "pixi")],
+    [(None, "uv"), ("montec-common", "uv"), ("montec-common", "pixi")],
 )
 def test_namespace_distribution_name(
     tmp_path: Path,
@@ -795,7 +802,7 @@ def test_namespace_distribution_name(
     assert (project / "src/montec/common/__init__.py").is_file()
     assert not (project / "src/montec/__init__.py").exists()
 
-    monkeypatch.setenv("UV_DYNAMIC_VERSIONING_BYPASS", "1.2.3")
+    monkeypatch.setenv("SETUPTOOLS_SCM_PRETEND_VERSION", "1.2.3")
     subprocess.run(  # noqa: S603
         [sys.executable, "-m", "hatchling", "build", "-t", "wheel"],
         cwd=project,
@@ -827,12 +834,63 @@ def test_namespace_distribution_name(
     )
 
 
-@pytest.mark.parametrize("name", ["", ".bad", "bad-", "bad/name", "bad name", '"bad"'])
+def test_distribution_keys_match_pyproject_fmt(
+    tmp_path: Path, template_source: Path
+) -> None:
+    """Write distribution-name keys bare, as pyproject-fmt does.
+
+    pyproject-fmt rewrites quoted keys that are valid bare TOML keys, which would
+    make the generated pre-commit hook change ``pyproject.toml`` and fail checks.
+    """
+    distribution_name = "example-package"
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "distribution_name": distribution_name,
+            "package_manager": "pixi",
+            "entry_points": ["cli"],
+            "cli": "argparse",
+            "features": [],
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    lines = (project / "pyproject.toml").read_text().splitlines()
+    assert f'scripts.{distribution_name} = "example_package.cli:main"' in lines
+    assert (
+        f'pypi-dependencies.{distribution_name} = {{ path = ".", editable = true }}'
+        in lines
+    )
+    config = tomllib.loads("\n".join(lines))
+    assert distribution_name in config["project"]["scripts"]
+    assert distribution_name in config["tool"]["pixi"]["pypi-dependencies"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        ".bad",
+        "bad-",
+        "bad/name",
+        "bad name",
+        '"bad"',
+        "montec.common",
+        "montec_common",
+        "Montec-Common",
+        "montec--common",
+    ],
+)
 def test_invalid_distribution_name_is_rejected(
     tmp_path: Path, template_source: Path, name: str
 ) -> None:
-    """Reject distribution names that cannot be used in package metadata."""
-    with pytest.raises(ValueError, match="Enter a distribution name"):
+    """Reject distribution names that are invalid or not normalized."""
+    with pytest.raises(ValueError, match="Enter a normalized distribution name"):
         copier.run_copy(
             str(template_source),
             tmp_path / "project",
@@ -857,7 +915,7 @@ def test_built_wheel_preserves_import_path(
         sibling = project / Path(source).parent / "unrelated_package"
         sibling.mkdir()
         (sibling / "__init__.py").write_text("")
-    monkeypatch.setenv("UV_DYNAMIC_VERSIONING_BYPASS", "1.2.3")
+    monkeypatch.setenv("SETUPTOOLS_SCM_PRETEND_VERSION", "1.2.3")
     subprocess.run(  # noqa: S603
         [sys.executable, "-m", "hatchling", "build", "-t", "wheel"],
         cwd=project,
@@ -921,6 +979,69 @@ def test_built_wheel_preserves_import_path(
             capture_output=True,
             text=True,
         )
+
+
+@pytest.mark.parametrize(
+    ("annotated_tags_only", "expected"), [(True, "1.0.1"), (False, "2.0.0")]
+)
+def test_version_ignores_lightweight_tags(
+    tmp_path: Path,
+    template_source: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    annotated_tags_only: bool,  # noqa: FBT001
+    expected: str,
+) -> None:
+    """Derive versions from annotated tags only when the option is enabled."""
+    project = tmp_path / "project"
+    copier.run_copy(
+        str(template_source),
+        project,
+        data={
+            "project_name": "example-package",
+            "project_description": "Example package",
+            "annotated_tags_only": annotated_tags_only,
+            "features": [],
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+    )
+    git = shutil.which("git")
+    assert git is not None
+    monkeypatch.delenv("SETUPTOOLS_SCM_PRETEND_VERSION", raising=False)
+    identity = [
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@example.invalid",
+        "-c",
+        "commit.gpgSign=false",
+        "-c",
+        "tag.gpgSign=false",
+    ]
+
+    def run_git(*args: str) -> None:
+        subprocess.run(  # noqa: S603
+            [git, "-C", str(project), *identity, *args],
+            check=True,
+            capture_output=True,
+        )
+
+    run_git("init", "-q")
+    run_git("add", "-A")
+    run_git("commit", "-q", "-m", "Initial commit")
+    run_git("tag", "--annotate", "v1.0.0", "--message", "Release 1.0.0")
+    run_git("commit", "-q", "--allow-empty", "-m", "Next change")
+    run_git("tag", "v2.0.0")
+    subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "hatchling", "build", "-t", "wheel"],
+        cwd=project,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    (wheel,) = (project / "dist").glob("*.whl")
+    assert Version(wheel.name.split("-")[1]).base_version == expected
 
 
 def test_generated_agent_guide_uses_selected_layout(

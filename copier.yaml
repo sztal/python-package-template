@@ -56,13 +56,14 @@ distribution_name:
   help: What is the distribution name (used by pip)?
   default: "{{ project_name | slugify }}"
   validator: >-
-    {% set alphanumeric = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' %}
-    {% set allowed = alphanumeric ~ '._-' %}
+    {% set alphanumeric = 'abcdefghijklmnopqrstuvwxyz0123456789' %}
+    {% set allowed = alphanumeric ~ '-' %}
     {% if not distribution_name
        or distribution_name[0] not in alphanumeric
        or distribution_name[-1] not in alphanumeric
+       or '--' in distribution_name
        or distribution_name | select('in', allowed) | list | length != distribution_name | length %}
-    Enter a distribution name using letters, numbers, dots, underscores, and hyphens, starting and ending with a letter or number.
+    Enter a normalized distribution name using lowercase letters, numbers, and single hyphens, starting and ending with a letter or number.
     {% endif %}
 
 package_name:
@@ -158,6 +159,11 @@ require_typecheck:
 changelog:
   type: bool
   help: Use a changelog and Towncrier?
+  default: true
+
+annotated_tags_only:
+  type: bool
+  help: Derive versions only from annotated Git tags, ignoring lightweight tags?
   default: true
 
 minimum_python:
@@ -268,7 +274,7 @@ legacy_namespace_layout:
 package_layout:
   type: str
   help: Which package layout do you want to use?
-  default: flat
+  default: "{{ 'flat' if legacy_namespace_layout else 'src' }}"
   choices:
     Flat package: flat
     Source package: src

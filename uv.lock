@@ -189,6 +189,19 @@ wheels = [
 ]
 
 [[package]]
+name = "hatch-vcs"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "hatchling" },
+    { name = "setuptools-scm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6b/b0/4cc743d38adbee9d57d786fa496ed1daadb17e48589b6da8fa55717a0746/hatch_vcs-0.5.0.tar.gz", hash = "sha256:0395fa126940340215090c344a2bf4e2a77bcbe7daab16f41b37b98c95809ff9", size = 11424, upload-time = "2025-05-27T05:16:04.49Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5f/48/1f85cee4b7b4f40b9b814b1febbc661bda6ced9649e410a0b74f6e415dd0/hatch_vcs-0.5.0-py3-none-any.whl", hash = "sha256:b49677dbdc597460cc22d01b27ab3696f5e16a21ecf2700fb01bc28e1f2a04a7", size = 8507, upload-time = "2025-05-27T05:16:03.184Z" },
+]
+
+[[package]]
 name = "hatchling"
 version = "1.33.0"
 source = { registry = "https://pypi.org/simple" }
@@ -638,12 +651,14 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage" },
+    { name = "hatch-vcs" },
     { name = "hatchling" },
     { name = "mypy" },
+    { name = "packaging" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-xdist" },
-    { name = "uv-dynamic-versioning" },
+    { name = "setuptools-scm" },
 ]
 docs = [
     { name = "zensical" },
@@ -653,18 +668,22 @@ lint = [
 ]
 test = [
     { name = "coverage" },
+    { name = "hatch-vcs" },
     { name = "hatchling" },
+    { name = "packaging" },
     { name = "pytest" },
     { name = "pytest-xdist" },
-    { name = "uv-dynamic-versioning" },
+    { name = "setuptools-scm" },
 ]
 type = [
     { name = "coverage" },
+    { name = "hatch-vcs" },
     { name = "hatchling" },
     { name = "mypy" },
+    { name = "packaging" },
     { name = "pytest" },
     { name = "pytest-xdist" },
-    { name = "uv-dynamic-versioning" },
+    { name = "setuptools-scm" },
 ]
 
 [package.metadata]
@@ -676,29 +695,35 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.11" },
+    { name = "hatch-vcs", specifier = ">=0.5" },
     { name = "hatchling", specifier = ">=1.27" },
     { name = "mypy", specifier = ">=1.19" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pre-commit", specifier = ">=4.5" },
     { name = "pytest", specifier = ">=9" },
     { name = "pytest-xdist", specifier = ">=3.8" },
-    { name = "uv-dynamic-versioning", specifier = ">=0.14" },
+    { name = "setuptools-scm", specifier = ">=10" },
 ]
 docs = [{ name = "zensical", specifier = ">=0.0.11" }]
 lint = [{ name = "pre-commit", specifier = ">=4.5" }]
 test = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.11" },
+    { name = "hatch-vcs", specifier = ">=0.5" },
     { name = "hatchling", specifier = ">=1.27" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pytest", specifier = ">=9" },
     { name = "pytest-xdist", specifier = ">=3.8" },
-    { name = "uv-dynamic-versioning", specifier = ">=0.14" },
+    { name = "setuptools-scm", specifier = ">=10" },
 ]
 type = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.11" },
+    { name = "hatch-vcs", specifier = ">=0.5" },
     { name = "hatchling", specifier = ">=1.27" },
     { name = "mypy", specifier = ">=1.19" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pytest", specifier = ">=9" },
     { name = "pytest-xdist", specifier = ">=3.8" },
-    { name = "uv-dynamic-versioning", specifier = ">=0.14" },
+    { name = "setuptools-scm", specifier = ">=10" },
 ]
 
 [[package]]
@@ -763,6 +788,29 @@ wheels = [
 ]
 
 [[package]]
+name = "setuptools"
+version = "84.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/b3/c19426f783614d625699a4b247faf628ea9ab1db228674491767b417f9e1/setuptools-84.2.1.tar.gz", hash = "sha256:3ff8b3b5492a0aa66960f4419365a86b84e013070d4313e4d4a6894f5d64d6bc", size = 1230289, upload-time = "2026-10-20T19:01:37.742Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl", hash = "sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2", size = 876263, upload-time = "2026-10-20T19:01:35.678Z" },
+]
+
+[[package]]
+name = "setuptools-scm"
+version = "10.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "setuptools" },
+    { name = "vcs-versioning" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/b1/d0b97ffd2856a7d19c63024a89fb84813cb9d2ed7fa8fdbedf9e2f13a9ab/setuptools_scm-10.2.1.tar.gz", hash = "sha256:4fa7dd82cf8c800df59c9a288c90299b1657ff1ecfc3f5cc00287c5dbf5e27a9", size = 154237, upload-time = "2026-07-21T08:08:04.553Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c3/b4/02ac1d9833b882c87b3a4e82703e70eac4ab33d0d15fb123e60bb01f3bc1/setuptools_scm-10.2.1-py3-none-any.whl", hash = "sha256:b7c82f4102d389ee57dc66ccdb4f9b4bca3c40ba83b43f1f63d68ccd72db2580", size = 29078, upload-time = "2026-07-21T08:08:03.293Z" },
+]
+
+[[package]]
 name = "tomlkit"
 version = "0.15.2"
 source = { registry = "https://pypi.org/simple" }
@@ -802,18 +850,15 @@ wheels = [
 ]
 
 [[package]]
-name = "uv-dynamic-versioning"
-version = "0.14.1"
+name = "vcs-versioning"
+version = "2.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "dunamai" },
-    { name = "hatchling" },
-    { name = "jinja2" },
-    { name = "tomlkit" },
+    { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6f/c8/fa500ee29af69cfeeea5ff6d6597919f1989b2e3f1a236c3006bdb21d320/uv_dynamic_versioning-0.14.1.tar.gz", hash = "sha256:8642db686ce5c50417035e7a257ac73b7e5c3a7a32c33e45bd7e36ba22eeb648", size = 42153, upload-time = "2026-08-18T10:50:14.069Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/95/c95bb74950763a163defcf4cedf6c5edfca1d623fd5031b76516ece85076/vcs_versioning-2.2.2.tar.gz", hash = "sha256:4ac4ded78720cdb4d0291ae58ace87e1e9201912e1023f3029c6cce5c9152cfb", size = 143135, upload-time = "2026-06-29T13:26:06.901Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/8c/98ca22d2e282d2c0a4d1fad3faece26c9cb695d23f5d255ae93398d594ca/uv_dynamic_versioning-0.14.1-py3-none-any.whl", hash = "sha256:f9db710cc2ce9dccf06fab958ad10c45cae43cff70e3eccaa89365b040e98306", size = 11083, upload-time = "2026-08-18T10:50:13.095Z" },
+    { url = "https://files.pythonhosted.org/packages/85/9e/1f06f4ddc3a74ccfe0877490caaf4a5233e65401160afc8cb13207815f5e/vcs_versioning-2.2.2-py3-none-any.whl", hash = "sha256:fe7fb216f8780a5516e7864a9333aacb1b70015b087a9be3918da76ef2760808", size = 108014, upload-time = "2026-06-29T13:26:05.367Z" },
 ]
 
 [[package]]

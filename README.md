@@ -85,7 +85,9 @@ from the answers rather than prompted for separately.
 
 - `project_name` and `project_description`: the project name and description.
 - `distribution_name`: the name used by pip; defaults to a slug of
-  `project_name` and can differ from the Python import name.
+  `project_name` and can differ from the Python import name. It must be
+  normalized: lowercase letters, numbers, and single hyphens, such as
+  `montec-common` (never the dotted import path `montec.common`).
 - `user_name` and `user_email`: author and maintainer details, defaulting to
   the local Git `user.name` and `user.email`.
 - `public_github`: whether to assume a public GitHub repository; enabled by
@@ -105,7 +107,7 @@ from the answers rather than prompted for separately.
 
 ### Package and Python versions
 
-- `package_layout`: a flat (default) or `src` source layout.
+- `package_layout`: a `src` (default) or flat source layout.
 - `package_type`: a standard (default) or implicit namespace package, selected
   independently of the layout. With `namespace`, `namespace_name` specifies
   the top-level namespace; it defaults to the package name and must be a Python
@@ -143,6 +145,10 @@ from the answers rather than prompted for separately.
 - `changelog`: enable changelog and Towncrier support; enabled by default.
   Fragments are added when a development branch is merged into the integration
   branch and assembled during release preparation.
+- `annotated_tags_only`: derive versions only from annotated `v[0-9]*` Git
+  tags; enabled by default. `git describe` then runs without `--tags`, so
+  lightweight tags never change the version and can serve as arbitrary anchors.
+  When disabled, setuptools-scm also considers lightweight tags.
 - `pytest_testmon`: `no` (default), `manual` to opt in with `pytest --testmon`,
   or `automatic` to use it by default. Coverage targets disable testmon so
   they run the full suite.
@@ -194,7 +200,9 @@ Existing projects previously used strict type checking; the new
 `typecheck_level` defaults to `strict` when updating their saved answers.
 The newly visible `distribution_name` defaults to the slug of `project_name`;
 if an existing project used a different distribution name, enter it when
-prompted and review the update diff.
+prompted and review the update diff. Distribution names must now be normalized
+(for example `montec-common`); a saved name with dots, underscores, or
+uppercase letters is rejected on update and must be re-entered in that form.
 Review the update diff when disabling public GitHub, Actions, publishing, or
 a license: Copier can preserve locally modified files. Existing projects keep
 their saved answers; review the selected manager and regenerate its lockfile
@@ -207,6 +215,15 @@ previously built top-level package to use the qualified import name
 `namespace_name.package_name`; update downstream imports and review the
 generated distribution before releasing it. When overriding both the layout
 and namespace name during that update, also set `package_type=namespace`.
+
+New projects default to the `src` layout. Existing projects keep their saved
+`package_layout` on update; moving a flat project to `src` is a manual change
+of the package directory and should be reviewed separately.
+Versions are now derived by `hatch-vcs` (setuptools-scm) instead of
+`uv-dynamic-versioning`. Updated projects use only annotated tags for versions
+unless `annotated_tags_only=false` is set; check that every release tag is
+annotated (`git for-each-ref refs/tags --format='%(objecttype) %(refname:short)'`)
+before updating.
 
 Projects using a `target_python` below `py313` must select a supported target
 when updating. Existing saved targets are retained; the new `minimum_python`
@@ -284,9 +301,9 @@ The template produces a complete project workflow rather than only a package
 directory:
 
 - `pyproject.toml`: Hatchling build backend, Git-tag versioning through
-  `uv-dynamic-versioning`, project metadata, dependency groups, Ruff, pytest,
+  `hatch-vcs` (setuptools-scm), project metadata, dependency groups, Ruff, pytest,
   coverage, mypy, and optional Towncrier settings;
-- a flat or `src/` package directory, optionally under an implicit namespace:
+- a `src/` (default) or flat package directory, optionally under an implicit namespace:
   selected independently by `package_layout` and `package_type`;
 - `tests/`: pytest fixtures and version checks;
 - `noxfile.py`: optional test, lint, type-check, and documentation sessions
@@ -306,7 +323,9 @@ directory:
 - optional `LICENSE`, `CHANGELOG.md`, and `CODE_OF_CONDUCT.md`.
 
 The generated build uses Git tags as its version source. A release tag such as
-`v1.2.3` produces package metadata with version `1.2.3`.
+`v1.2.3` produces package metadata with version `1.2.3`. By default only
+annotated tags count (see `annotated_tags_only`); between releases, versions are
+setuptools-scm development versions such as `1.2.4.dev3+g1a2b3c4`.
 
 ## Agent Context And Skills
 
@@ -357,7 +376,7 @@ uv run copier copy --trust --defaults \
   . /tmp/smoke-test
 ```
 
-At minimum, check the default flat layout, a `src` layout, a namespace layout,
+At minimum, check the default `src` layout, a flat layout, a namespace layout,
 documentation and Nox both enabled and disabled, and the optional Code of
 Conduct. For generated projects, initialize Git, create a version tag,
 and run:

@@ -49,10 +49,12 @@ dev = [
 ]
 test = [
   "coverage[toml]>=7.11",
+  "hatch-vcs>=0.5",
   "hatchling>=1.27",
+  "packaging>=24.2",
   "pytest>=9",
   "pytest-xdist>=3.8",
-  "uv-dynamic-versioning>=0.14",
+  "setuptools-scm>=10",
 ]
 type = [
   "mypy>=1.19",

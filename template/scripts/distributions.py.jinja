@@ -136,7 +136,11 @@ def inspect(directory: Path, tag: str | None = None) -> tuple[Path, Path]:
 
 def check(directory: Path, tag: str | None = None) -> None:
     """Check artifacts, rebuild the sdist, and install the wheels in isolation."""
-    if os.environ.get("UV_DYNAMIC_VERSIONING_BYPASS"):
+    if any(
+        name == "SETUPTOOLS_SCM_PRETEND_VERSION"
+        or name.startswith("SETUPTOOLS_SCM_PRETEND_VERSION_FOR_")
+        for name in os.environ
+    ):
         raise ValueError("Do not override the version when checking distributions")
     wheel, sdist = inspect(directory, tag)
     subprocess.run(["twine", "check", "--strict", str(wheel), str(sdist)], check=True)
