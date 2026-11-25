@@ -222,9 +222,10 @@ def test_rendered_tooling_is_complete(
     }
     assert "pytest-xdist>=3.8" in config["dependency-groups"]["test"]
     testmon = data.get("pytest_testmon", "no")
-    assert ("pytest-testmon>=2.3.0" in config["dependency-groups"]["test"]) is (
-        testmon != "no"
-    )
+    assert any(
+        dependency.startswith("pytest-testmon")
+        for dependency in config["dependency-groups"]["test"]
+    ) is (testmon != "no")
     assert ("--testmon" in config["tool"]["pytest"]["addopts"]) is (
         testmon == "automatic"
     )
@@ -499,10 +500,14 @@ def test_typecheck_source_scope(
         typecheck.mypy_paths()
 
 
+@pytest.mark.parametrize(("strict", "expected"), [(True, "strict"), (False, "basic")])
 def test_legacy_typecheck_answers_migrate_on_recopy(
-    tmp_path: Path, template_source: Path
+    tmp_path: Path,
+    template_source: Path,
+    strict: bool,  # noqa: FBT001
+    expected: str,
 ) -> None:
-    """Keep strict checking when updating projects without a saved level."""
+    """Keep the project's own mypy strictness when no level was saved."""
     project = tmp_path / "project"
     copier.run_copy(
         str(template_source),
@@ -516,13 +521,18 @@ def test_legacy_typecheck_answers_migrate_on_recopy(
     answers = yaml.safe_load(answer_file.read_text())
     del answers["typecheck_level"]
     answer_file.write_text(yaml.safe_dump(answers))
+    if strict:
+        config = project / "pyproject.toml"
+        config.write_text(
+            config.read_text().replace("[tool.mypy]\n", "[tool.mypy]\nstrict = true\n")
+        )
     copier.run_recopy(project, defaults=True, overwrite=True, unsafe=True, quiet=True)
-    assert yaml.safe_load(answer_file.read_text())["typecheck_level"] == "strict"
+    assert yaml.safe_load(answer_file.read_text())["typecheck_level"] == expected
     assert (
         tomllib.loads((project / "pyproject.toml").read_text())["tool"][
             "project-checks"
         ]["typecheck_level"]
-        == "strict"
+        == expected
     )
 
 

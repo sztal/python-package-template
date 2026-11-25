@@ -44,6 +44,7 @@ entry points. Old files in `dist/` must be removed
 explicitly before checking another version. `TAG=v1.2.3` additionally requires
 a clean checkout, an annotated tag at the current commit, and an exact version
 match.
+
 Configure type checking in `[tool.project-checks]` in `pyproject.toml`:
 `typecheck_level` is `none`, `basic`, or `strict`, and `require_typecheck`
 controls whether failures block `make check`, release preparation{% if github_actions %},

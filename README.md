@@ -196,8 +196,10 @@ package layout or documentation settings.
 Existing projects using `main` should set `integration_branch=main` when
 updating; the new default is `master`. Review existing changelog files when
 disabling changelog support, as project-specific files may be preserved.
-Existing projects previously used strict type checking; the new
-`typecheck_level` defaults to `strict` when updating their saved answers.
+Projects generated before the `typecheck_level` question configured mypy
+directly. When updating one without a saved level, `typecheck_level` defaults
+to `strict` if its `[tool.mypy]` table still sets `strict = true`, and to
+`basic` otherwise; pass `--data typecheck_level=...` to choose explicitly.
 The newly visible `distribution_name` defaults to the slug of `project_name`;
 if an existing project used a different distribution name, enter it when
 prompted and review the update diff. Distribution names must now be normalized
@@ -291,6 +293,7 @@ The `extensions/` package provides small Jinja helpers used by `copier.yaml`:
 
 - `git.py`: reads Git identity values for author and maintainer defaults;
 - `slugify.py`: derives distribution and import-safe package names;
+- `pyproject.py`: reads an existing project's mypy strictness on update;
 - `today.py`: supplies the current date for generated metadata.
 
 These helpers are loaded through `_jinja_extensions` in `copier.yaml`.

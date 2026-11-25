@@ -8,6 +8,7 @@ _envops:
 _jinja_extensions:
   - copier_template_extensions.TemplateExtensionLoader
   - extensions/git.py:GitExtension
+  - extensions/pyproject.py:PyprojectExtension
   - extensions/slugify.py:SlugifyExtension
   - extensions/today.py:TodayExtension
   - jinja2.ext.ExprStmtExtension
@@ -137,10 +138,7 @@ integration_branch:
 typecheck_level:
   type: str
   help: How strictly should mypy check the project?
-  default: >-
-    {{ 'strict' if 'require_typecheck' in _copier_answers
-       and 'typecheck_level' not in _copier_answers
-       and 'require_typecheck' not in _copier_conf.data else 'basic' }}
+  default: "{{ 'strict' if _copier_conf.dst_path | mypy_strict else 'basic' }}"
   choices:
     None: none
     Basic: basic
