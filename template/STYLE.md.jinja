@@ -1,0 +1,63 @@
+# Python style guide
+
+Follow the configured Ruff rules in `pyproject.toml`. This document specifies
+the project conventions that complement those rules.
+
+## Code and documentation
+
+- Use double quotes for all strings.
+- Add type hints to all code.
+- Use NumPy-style docstrings only.
+- Thoroughly document public classes and methods.
+- Private classes, methods, globals, and similar implementation details may
+  have brief documentation or none when their purpose is clear from context.
+- Make errors and warnings concise and informative. Avoid multi-sentence
+  messages unless a single sentence would sacrifice clarity.
+
+## Annotations and imports
+
+{% if minimum_python.split('.')[1] | int >= 15 %}Annotations are deferred (PEP 649) and must evaluate at runtime: libraries
+such as Pydantic, dispatch frameworks, and `inspect.signature` introspect them.
+
+- Do not use `from __future__ import annotations`, `if TYPE_CHECKING:` import
+  blocks, or quoted annotations.
+- Import names used only in annotations, or whose eager import would create an
+  import cycle, with module-level `lazy import` or `lazy from ... import ...`
+  (PEP 810).
+- Keep `TYPE_CHECKING` only for deliberate type-checker-only declarations,
+  such as narrowing an inherited attribute or Pydantic field type, or
+  static-versus-runtime definitions with an `else:` branch; mark its import
+  `# noqa: TID251`.
+- Code that inspects signatures without needing annotation values should use
+  `annotationlib.Format.FORWARDREF`.
+- Frameworks that inspect signatures while a class is being created resolve
+  lazy names immediately; keep the names in such signatures free of import
+  cycles.
+{% elif minimum_python.split('.')[1] | int >= 14 %}Annotations are deferred (PEP 649); do not use
+`from __future__ import annotations`.
+
+- Put imports needed only for type checking under `if TYPE_CHECKING:`.
+- Names in annotations that are evaluated at runtime, such as Pydantic models,
+  validated or dispatched functions, and signatures inspected by frameworks,
+  must be imported at runtime.
+- Code that inspects signatures without needing annotation values should use
+  `annotationlib.Format.FORWARDREF`.
+{% else %}- Start modules with `from __future__ import annotations`.
+- Put imports needed only for type checking under `if TYPE_CHECKING:`.
+- Names in annotations that are evaluated at runtime, such as Pydantic models,
+  validated or dispatched functions, and signatures inspected by frameworks,
+  must be imported at runtime.
+{% endif %}
+## Design
+
+- Prefer legible, concise, minimal code.
+- Avoid unnecessary abstractions and large collections of private helpers.
+- Inline very short helpers.
+- Do not extract simple logic merely because it appears once or twice. Keep
+  such logic at its call sites when it is likely to need independent changes.
+
+## Tests
+
+- Keep test suites DRY and concise.
+- Use pytest fixtures, parametrization, and mocks where they make tests more
+  readable or remove duplication.

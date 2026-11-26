@@ -1,8 +1,8 @@
 """Validate built source and wheel distributions."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import argparse
+{% endif %}import argparse
 import os
 import re
 import subprocess

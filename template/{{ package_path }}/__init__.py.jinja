@@ -1,8 +1,8 @@
 """{{ project_description or project_name }}."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-__all__ = ("__version__",)
+{% endif %}__all__ = ("__version__",)
 
 import importlib.metadata
 

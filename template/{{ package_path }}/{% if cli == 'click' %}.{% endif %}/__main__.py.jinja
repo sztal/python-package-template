@@ -1,7 +1,7 @@
 """The main program."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-from .cli import main
+{% endif %}from .cli import main
 
 main()

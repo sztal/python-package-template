@@ -1,8 +1,8 @@
 """Apply the project's type-checking level and validation policy."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import subprocess
+{% endif %}import subprocess
 import sys
 import tomllib
 from pathlib import Path

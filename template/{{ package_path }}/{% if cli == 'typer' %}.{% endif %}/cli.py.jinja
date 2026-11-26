@@ -1,8 +1,8 @@
 """The command-line interface."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-from typing import Annotated
+{% endif %}from typing import Annotated
 
 import typer
 

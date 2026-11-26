@@ -18,6 +18,8 @@ import yaml
 from packaging.version import Version
 
 MIN_COVERAGE = 90
+DEFERRED_ANNOTATIONS_MINOR = 14  # PEP 649
+LAZY_IMPORTS_MINOR = 15  # PEP 810
 
 
 def assert_git_ignores(project: Path, ignored: list[str], allowed: list[str]) -> None:
@@ -577,6 +579,30 @@ def test_generated_python_versions(
             in (project / "noxfile.py").read_text()
         )
         assert f"tests-{minimum_python}" in (project / "README.md").read_text()
+
+
+def test_generated_annotation_policy(
+    generated: tuple[Path, dict[str, object]],
+) -> None:
+    """Postpone annotations before 3.14 and use lazy imports from 3.15."""
+    project, data = generated
+    minimum_python = data.get("minimum_python", "3.13")
+    assert isinstance(minimum_python, str)
+    minor = int(minimum_python[2:])
+    with (project / "pyproject.toml").open("rb") as stream:
+        lint = tomllib.load(stream)["tool"]["ruff"]["lint"]
+    banned = lint.get("flake8-tidy-imports", {}).get("banned-api", {})
+    postponed = [
+        path
+        for path in project.rglob("*.py")
+        if "from __future__ import annotations" in path.read_text()
+    ]
+    deferred = minor >= DEFERRED_ANNOTATIONS_MINOR
+    assert bool(postponed) is not deferred
+    assert lint.get("future-annotations", False) is not deferred
+    assert ("TID251" in lint["select"]) is deferred
+    assert ("__future__.annotations" in banned) is deferred
+    assert ("typing.TYPE_CHECKING" in banned) is (minor >= LAZY_IMPORTS_MINOR)
 
 
 def test_target_below_minimum_is_rejected(

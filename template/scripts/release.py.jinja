@@ -1,8 +1,8 @@
 """Prepare a validated local release without pushing or publishing."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import argparse
+{% endif %}import argparse
 import os
 import shutil
 import subprocess

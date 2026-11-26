@@ -10,6 +10,10 @@ projects. See [README.md](README.md) for the repository structure and workflow.
 - Do not maintain a changelog for this repository: do not update
   `CHANGELOG.md` or add changelog fragments for development work.
 - Generated projects may retain their own changelog and release tooling.
+- Generated annotation and import rules depend on `minimum_python`: postponed
+  annotations before 3.14, deferred annotations from 3.14, and `lazy` imports
+  instead of `TYPE_CHECKING` blocks from 3.15. Keep `template/STYLE.md.jinja`,
+  the generated Ruff `TID251` bans, and generated module headers consistent.
 - When merging a development branch into `master`, use `git merge --squash`
   and create one commit with a descriptive subject and a detailed body covering
   the changes, their rationale, and validation.

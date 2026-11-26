@@ -1,8 +1,8 @@
 """Tests for reusable package release tooling."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import io
+{% endif %}import io
 import subprocess
 import tarfile
 import zipfile

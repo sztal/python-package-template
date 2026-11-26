@@ -176,7 +176,8 @@ lint.select = [
   "PIE",
   "RUF",
   "SIM",
-  "UP",
+{% if minimum_python.split('.')[1] | int >= 14 %}  "TID251",
+{% endif %}  "UP",
   "W",
 ]
 lint.ignore = [
@@ -187,12 +188,14 @@ lint.ignore = [
 lint.per-file-ignores."tests/**" = [
   "S101", # using assert is okay in tests
 ]
-lint.isort.known-first-party = [
+{% if minimum_python.split('.')[1] | int >= 14 %}lint.flake8-tidy-imports.banned-api."__future__.annotations".msg = "annotations are deferred (PEP 649)"
+{% endif %}{% if minimum_python.split('.')[1] | int >= 15 %}lint.flake8-tidy-imports.banned-api."typing.TYPE_CHECKING".msg = "use module-level lazy imports (PEP 810)"
+{% endif %}lint.isort.known-first-party = [
   "{{ namespace_name if package_type == 'namespace' else package_name }}",
 ]
 lint.pydocstyle.convention = "numpy"
-lint.future-annotations = true
-
+{% if minimum_python.split('.')[1] | int < 14 %}lint.future-annotations = true
+{% endif %}
 [tool.codespell]
 write-changes = true
 

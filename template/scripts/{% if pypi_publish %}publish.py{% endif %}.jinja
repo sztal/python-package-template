@@ -1,9 +1,9 @@
 {% if github_actions -%}
 """Verify release tags and explicitly dispatch package publishing."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import argparse
+{% endif %}import argparse
 import json
 import os
 import subprocess
@@ -179,9 +179,9 @@ if __name__ == "__main__":
 {%- else -%}
 """Explicitly publish locally validated release artifacts."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import argparse
+{% endif %}import argparse
 import os
 import subprocess
 from pathlib import Path

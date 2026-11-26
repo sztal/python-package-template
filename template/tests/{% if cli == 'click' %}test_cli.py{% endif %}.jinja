@@ -1,8 +1,8 @@
 """Tests for the command-line interface."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import pytest
+{% endif %}import pytest
 from click.testing import CliRunner
 
 from {{ import_name }} import __version__

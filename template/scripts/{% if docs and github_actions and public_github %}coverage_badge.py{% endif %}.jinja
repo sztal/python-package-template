@@ -1,8 +1,8 @@
 """Create a coverage badge from a coverage.py JSON report."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import argparse
+{% endif %}import argparse
 import json
 from pathlib import Path
 

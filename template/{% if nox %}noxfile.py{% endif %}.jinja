@@ -10,9 +10,9 @@
 {% endif -%}
 """Development checks with Nox."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import os
+{% endif %}import os
 from pathlib import Path
 
 import nox
@@ -178,9 +178,9 @@ if __name__ == "__main__":
 {%- else -%}
 """Development checks using locked Pixi environments."""
 
-from __future__ import annotations
+{% if minimum_python.split('.')[1] | int < 14 %}from __future__ import annotations
 
-import os
+{% endif %}import os
 from pathlib import Path
 
 import nox
